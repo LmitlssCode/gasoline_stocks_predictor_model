@@ -152,6 +152,32 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 .log-wrap{max-height:250px;overflow-y:auto;background:var(--bg-input);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);line-height:1.6;margin-top:10px}
 .log-wrap .log-ok{color:var(--accent-green)}.log-wrap .log-warn{color:var(--accent-orange)}.log-wrap .log-err{color:var(--accent-red)}
 
+/* ─── Help Modal ─── */
+#help-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#help-modal-overlay.open{display:flex}
+#help-modal{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:var(--radius-lg);width:90%;max-width:780px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#help-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+#help-modal-header h2{font-family:var(--font-mono);font-size:1rem;font-weight:600;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0}
+#help-modal-close{background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);border-radius:var(--radius);padding:4px 10px;cursor:pointer;font-size:.85rem;transition:all .2s}
+#help-modal-close:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+#help-modal-body{padding:20px;overflow-y:auto;font-family:var(--font-display);font-size:.85rem;color:var(--text-secondary);line-height:1.7}
+#help-modal-body h1,#help-modal-body h2,#help-modal-body h3{font-family:var(--font-mono);color:var(--text-primary);margin:18px 0 8px}
+#help-modal-body h1{font-size:1.1rem;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#help-modal-body h2{font-size:.95rem;border-bottom:1px solid var(--border);padding-bottom:6px}
+#help-modal-body h3{font-size:.85rem}
+#help-modal-body p{margin:8px 0}
+#help-modal-body code{font-family:var(--font-mono);font-size:.78rem;background:var(--bg-input);padding:2px 6px;border-radius:4px;color:var(--accent-cyan)}
+#help-modal-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.78rem}
+#help-modal-body th,#help-modal-body td{text-align:left;padding:6px 10px;border:1px solid var(--border)}
+#help-modal-body th{background:var(--bg-input);color:var(--text-primary);font-weight:600}
+#help-modal-body strong{color:var(--text-primary)}
+#help-modal-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+#help-modal-body ul,#help-modal-body ol{padding-left:20px;margin:8px 0}
+#help-modal-body li{margin:4px 0}
+#help-modal-body blockquote{border-left:3px solid var(--accent-blue);padding:8px 14px;margin:10px 0;background:var(--bg-input);border-radius:0 var(--radius) var(--radius) 0}
+#help-modal-body a{color:var(--accent-cyan);text-decoration:none}
+#help-modal-body a:hover{text-decoration:underline}
+
 /* ─── Loading ─── */
 #loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity .5s}
 #loading-overlay.hidden{opacity:0;pointer-events:none}
@@ -217,6 +243,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
     <button class="primary" id="btn-run">&#9654; Run Forecast</button>
     <button id="btn-refresh" title="Reload latest data from EIA">&#8635; Refresh</button>
     <button id="btn-export" title="Export forecast data to CSV">&#8615; CSV</button>
+    <button id="btn-help" title="View model documentation">&#9432; Model Help</button>
   </div>
   <div class="header-right">
     <div class="data-badge" id="sd-badge" title="Supply &amp; Demand data status">S&D: <strong>—</strong></div>
@@ -538,6 +565,17 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
     </div>
   </div>
 </main>
+
+<!-- Help Modal -->
+<div id="help-modal-overlay">
+  <div id="help-modal">
+    <div id="help-modal-header">
+      <h2>&#9432; Model Documentation</h2>
+      <button id="help-modal-close">&times; Close</button>
+    </div>
+    <div id="help-modal-body"></div>
+  </div>
+</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -2339,6 +2377,129 @@ const APP = {
       } else {
         log('No forecast to export', 'warn');
       }
+    });
+
+    // Help modal
+    const helpOverlay = document.getElementById('help-modal-overlay');
+    const helpBody = document.getElementById('help-modal-body');
+    const HELP_HTML = `
+<h1>Gasoline Stock Predictions v5</h1>
+<p>A single-file, browser-based dashboard for forecasting weekly US gasoline inventory levels using EIA petroleum data. Built for commodity traders and analysts tracking RBOB, CBOB, and total motor gasoline stocks across US PADD regions.</p>
+<hr>
+<h2>Overview</h2>
+<p>This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels <strong>1\u20134 weeks forward</strong>. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.</p>
+<p><strong>Products supported:</strong></p>
+<ul>
+<li>Total Motor Gasoline (EPM0)</li>
+<li>RBOB Gasoline (EPOBGRR)</li>
+<li>CBOB Gasoline (EPOBGCC)</li>
+</ul>
+<p><strong>Regions supported:</strong></p>
+<ul>
+<li>US Total (NUS)</li>
+<li>PADD 1 (East Coast)</li>
+<li>PADD 2 (Midwest)</li>
+<li>PADD 3 (Gulf Coast)</li>
+<li>PADD 4 (Rocky Mountain)</li>
+<li>PADD 5 (West Coast)</li>
+</ul>
+<hr>
+<h2>How It Works</h2>
+<h3>Data Inputs</h3>
+<p>All data is pulled from the EIA API v2 (<code>api.eia.gov/v2/petroleum/</code>):</p>
+<table>
+<tr><th>Series</th><th>Description</th></tr>
+<tr><td>Weekly stocks</td><td>Primary target variable (kbbl)</td></tr>
+<tr><td>Production</td><td>Domestic refinery output</td></tr>
+<tr><td>Imports / Exports</td><td>Trade flows</td></tr>
+<tr><td>Refinery utilization</td><td>Capacity utilization rate</td></tr>
+<tr><td>Demand (product supplied)</td><td>Implied consumption</td></tr>
+</table>
+<p>Data is cached in memory with a 30-minute TTL and auto-refreshes when you click <strong>Run Forecast</strong>.</p>
+<hr>
+<h3>Prediction Models</h3>
+<p>Three primary models form the base layer of the ensemble:</p>
+<h3>1. S&amp;D Regression</h3>
+<p>A ridge regression (\u03bb = 1.0) trained on supply-and-demand features. Uses forward stepwise feature selection to choose the most predictive subset from ~10 candidate features: lagged production, import delta, export delta, refinery utilization change, demand delta, and their recent trends.</p>
+<h3>2. S&amp;D Balance</h3>
+<p>A seasonally-aware projection model. Computes the implied weekly stock change from net supply minus demand, then anchors the forecast to same-week-last-year stock levels, blending recent build/draw trajectory with seasonal norms.</p>
+<h3>3. AR(6) Autoregressive Model</h3>
+<p>An autoregressive model using the prior 6 weeks of stock levels. Captures momentum and mean reversion. Acts as a pure time-series baseline.</p>
+<p><strong>Fallback models</strong> (used when S&amp;D data is unavailable):</p>
+<ul>
+<li><strong>Seasonal Naive</strong>: Projects same-week-last-year stock level forward</li>
+<li><strong>Holt-Winters</strong>: Exponential smoothing with trend and seasonality components</li>
+</ul>
+<hr>
+<h3>Regime Detection</h3>
+<p>Before blending, the model detects the current market regime using five signals:</p>
+<table>
+<tr><th>Feature</th><th>Description</th></tr>
+<tr><td>Season</td><td>Categorical: build (Oct\u2013Mar), draw (Apr\u2013Sep), peak (Jul\u2013Aug), shoulder (Sep/Apr)</td></tr>
+<tr><td>Volatility ratio</td><td>8-week vs. 52-week realized stock volatility</td></tr>
+<tr><td>Turnaround flag</td><td>Binary: refinery utilization dropped &gt;3 pts over 4 weeks</td></tr>
+<tr><td>Momentum</td><td>Direction and magnitude of recent 4-week stock change</td></tr>
+<tr><td>Season \u00d7 Volatility</td><td>Interaction term</td></tr>
+</table>
+<hr>
+<h3>Meta-Learner (Ensemble Model)</h3>
+<p>The meta-learner is a ridge regression (\u03bb = 0.5) trained on a rolling 30-week backtest. It learns 10 coefficients:</p>
+<ul>
+<li><strong>1 intercept</strong></li>
+<li><strong>3 model blend weights</strong> \u2014 how much to trust S&amp;D Regression, S&amp;D Balance, and AR(6)</li>
+<li><strong>7 regime bias adjustments</strong> \u2014 how each regime feature should shift the final prediction</li>
+</ul>
+<p>When fewer than 30 backtest samples exist, the meta-learner falls back to an <strong>inverse-MAE weighted average</strong> with exponential decay.</p>
+<hr>
+<h3>Confidence Intervals</h3>
+<p>80% confidence intervals are computed from a 52-week rolling backtest window. The 10th and 90th percentile of residuals define the CI band, scaled forward by forecast horizon.</p>
+<hr>
+<h2>Dashboard Features</h2>
+<h3>Main Forecast Tab</h3>
+<ul>
+<li>Interactive Chart.js time series with 5-year seasonal average band</li>
+<li>Historical stocks, ensemble forecast, and 80% CI shading</li>
+<li>Forecast table with all model outputs (kbbl)</li>
+<li>CSV export of full forecast table</li>
+<li>Scatter plot: Predicted vs. Actual for backtest window</li>
+</ul>
+<h3>Meta-Learner Tab</h3>
+<ul>
+<li><strong>Summary stats</strong>: R\u00b2, MAPE, directional accuracy</li>
+<li><strong>Current regime</strong>: Active regime features and their values</li>
+<li><strong>Model blend weights chart</strong>: Coefficients for each base model</li>
+<li><strong>Regime bias chart</strong>: All 7 regime coefficients, with active features highlighted</li>
+<li><strong>Blending walkthrough</strong>: Step-by-step table showing how each component contributes</li>
+</ul>
+<hr>
+<h2>Usage</h2>
+<ol>
+<li>Open the dashboard in any modern browser</li>
+<li>Enter your EIA API key (free at <a href="https://www.eia.gov/opendata/" target="_blank">eia.gov/opendata</a>)</li>
+<li>Select product and PADD region</li>
+<li>Click <strong>Run Forecast</strong></li>
+<li>Adjust forecast horizon (1\u20134 weeks) as needed</li>
+<li>Use the <strong>Meta-Learner</strong> tab to inspect model internals</li>
+<li>Export forecast to CSV if needed</li>
+</ol>
+<blockquote><strong>Note on performance by region/product:</strong> Forecast accuracy is highest for US Total Motor Gasoline due to the volume of EIA data available. Individual PADD regions and sub-products (RBOB, CBOB) show higher MAPE and lower directional accuracy because stock levels are smaller in absolute terms.</blockquote>
+<hr>
+<h2>Technical Notes</h2>
+<ul>
+<li><strong>No build tools required.</strong> All dependencies load from CDN (Chart.js, Papa Parse).</li>
+<li><strong>No backend.</strong> All computation runs client-side in the browser.</li>
+<li>Data units throughout are <strong>Thousand Barrels (kbbl)</strong>, consistent with EIA reporting.</li>
+</ul>
+`;
+    helpBody.innerHTML = HELP_HTML;
+    document.getElementById('btn-help').addEventListener('click', () => {
+      helpOverlay.classList.add('open');
+    });
+    document.getElementById('help-modal-close').addEventListener('click', () => {
+      helpOverlay.classList.remove('open');
+    });
+    helpOverlay.addEventListener('click', (e) => {
+      if (e.target === helpOverlay) helpOverlay.classList.remove('open');
     });
 
     document.getElementById('btn-export-detail').addEventListener('click', () => {
