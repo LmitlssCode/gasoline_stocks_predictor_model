@@ -6,7 +6,7 @@ A single-file, browser-based dashboard for forecasting weekly US gasoline invent
 
 ## Overview
 
-This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels 1–8 weeks forward. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.
+This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels 1–4 weeks forward. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.
 
 **Products supported:**
 - Total Motor Gasoline (EPM0)
@@ -124,7 +124,7 @@ Provides transparency into how the ensemble is making decisions:
 2. Enter your EIA API key (free at [eia.gov/opendata](https://www.eia.gov/opendata/))
 3. Select product and PADD region
 4. Click **Run Forecast** — data loads and the model runs automatically
-5. Adjust forecast horizon (1–8 weeks) as needed
+5. Adjust forecast horizon (1–4 weeks) as needed
 6. Use the **Meta-Learner** tab to inspect model internals
 7. Export forecast to CSV if needed
 
