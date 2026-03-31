@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gasoline Stock Prediction Engine</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #06090f;
+  --bg-card: #0d1117;
+  --bg-card-hover: #131a24;
+  --bg-input: #161b22;
+  --border: #21262d;
+  --border-accent: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-red: #f85149;
+  --accent-orange: #d29922;
+  --accent-purple: #bc8cff;
+  --accent-cyan: #39d2c0;
+  --accent-pink: #f778ba;
+  --forecast-1: #58a6ff;
+  --forecast-2: #bc8cff;
+  --forecast-3: #39d2c0;
+  --forecast-4: #d29922;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Outfit', sans-serif;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+.grain{position:fixed;top:0;left:0;width:100%;height:100%;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+header{position:sticky;top:0;z-index:100;background:rgba(6,9,15,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.logo{font-family:var(--font-mono);font-weight:700;font-size:1rem;letter-spacing:-.5px;white-space:nowrap;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-weight:300;opacity:.7}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.controls select,.controls button{font-family:var(--font-mono);font-size:.8rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;cursor:pointer;transition:all .2s}
+.controls select:hover,.controls button:hover{border-color:var(--accent-blue);background:var(--bg-card-hover)}
+.controls button.primary{background:linear-gradient(135deg,#1a3a5c,#162d4a);border-color:var(--accent-blue);color:var(--accent-blue);font-weight:600}
+.controls button.primary:hover{background:linear-gradient(135deg,#1f4470,#1a3a5c)}
+.status-pill{font-family:var(--font-mono);font-size:.7rem;padding:4px 10px;border-radius:20px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);margin-left:auto;white-space:nowrap}
+.status-pill.loading{border-color:var(--accent-orange);color:var(--accent-orange);animation:pulse 1.5s infinite}
+.status-pill.ready{border-color:var(--accent-green);color:var(--accent-green)}
+.status-pill.error{border-color:var(--accent-red);color:var(--accent-red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+main{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:20px 24px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.card-title{font-family:var(--font-mono);font-size:.75rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-blue);display:inline-block}
+.full-width{grid-column:1/-1}
+.chart-wrap{position:relative;width:100%}
+.chart-wrap.main-chart{height:420px}
+.chart-wrap.secondary-chart{height:340px}
+.forecast-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;grid-column:1/-1}
+.forecast-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.forecast-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.forecast-card:nth-child(1)::before{background:var(--forecast-1)}
+.forecast-card:nth-child(2)::before{background:var(--forecast-2)}
+.forecast-card:nth-child(3)::before{background:var(--forecast-3)}
+.forecast-card:nth-child(4)::before{background:var(--forecast-4)}
+.fc-label{font-family:var(--font-mono);font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.fc-value{font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:var(--text-primary);line-height:1}
+.fc-sub{font-family:var(--font-mono);font-size:.75rem;color:var(--text-muted);margin-top:4px}
+.fc-change{font-family:var(--font-mono);font-size:.8rem;font-weight:500;margin-top:6px}
+.fc-change.up{color:var(--accent-green)}.fc-change.down{color:var(--accent-red)}
+.fc-range{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);margin-top:4px}
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.metric-item{background:var(--bg-input);border-radius:6px;padding:10px;text-align:center}
+.metric-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+.metric-value{font-family:var(--font-mono);font-size:1.1rem;font-weight:600;color:var(--text-primary);margin-top:4px}
+.data-table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:.75rem}
+th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-accent);color:var(--text-secondary);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-size:.65rem;position:sticky;top:0;background:var(--bg-card)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text-primary)}
+tr:hover td{background:var(--bg-card-hover)}
+td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
+#loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity .5s}
+#loading-overlay.hidden{opacity:0;pointer-events:none}
+.loader-title{font-family:var(--font-mono);font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:20px}
+.loader-bar-track{width:300px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.loader-bar-fill{height:100%;width:0%;border-radius:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:width .3s}
+.loader-status{font-family:var(--font-mono);font-size:.75rem;color:var(--text-secondary);margin-top:12px}
+.log-wrap{max-height:250px;overflow-y:auto;background:var(--bg-input);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);line-height:1.6}
+.log-wrap .log-ok{color:var(--accent-green)}.log-wrap .log-warn{color:var(--accent-orange)}.log-wrap .log-err{color:var(--accent-red)}
+.time-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.time-btn{font-family:var(--font-mono);font-size:.7rem;padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+.time-btn:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+.time-btn.active{background:var(--accent-blue);color:#06090f;border-color:var(--accent-blue);font-weight:600}
+.time-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+.date-input{font-family:var(--font-mono);font-size:.7rem;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer;color-scheme:dark}
+.date-input:hover{border-color:var(--accent-blue)}
+.date-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+@media(max-width:900px){main{grid-template-columns:1fr}.forecast-row{grid-template-columns:repeat(2,1fr)}header{padding:10px 14px}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div id="loading-overlay">
+  <div class="loader-title">GASOLINE STOCK PREDICTION ENGINE</div>
+  <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-fill"></div></div>
+  <div class="loader-status" id="loader-status">Initializing...</div>
+</div>
+<header>
+  <div class="logo">GASOLINE PREDICT <span>v2.3</span></div>
+  <div class="controls">
+    <select id="sel-product">
+      <option value="totalMotorGas">Total Motor Gasoline</option>
+      <option value="rbob">RBOB (Reformulated Blendstock)</option>
+      <option value="cbob">CBOB (Conventional Blendstock)</option>
+    </select>
+    <select id="sel-padd">
+      <option value="NUS">U.S. Total</option>
+      <option value="R10">PADD 1 — East Coast</option>
+      <option value="R20">PADD 2 — Midwest</option>
+      <option value="R30">PADD 3 — Gulf Coast</option>
+      <option value="R40">PADD 4 — Rocky Mountain</option>
+      <option value="R50">PADD 5 — West Coast</option>
+    </select>
+    <button class="primary" id="btn-run">▶ Run Forecast</button>
+    <button id="btn-refresh" title="Reload latest data from EIA">↻ Refresh Data</button>
+  </div>
+  <div class="status-pill loading" id="status-pill">LOADING</div>
+</header>
+<main>
+  <div class="forecast-row">
+    <div class="forecast-card"><div class="fc-label">+1 Week</div><div class="fc-value" id="fc1-val">—</div><div class="fc-sub" id="fc1-sub"></div><div class="fc-change" id="fc1-chg"></div><div class="fc-range" id="fc1-rng"></div></div>
+    <div class="forecast-card"><div class="fc-label">+2 Weeks</div><div class="fc-value" id="fc2-val">—</div><div class="fc-sub" id="fc2-sub"></div><div class="fc-change" id="fc2-chg"></div><div class="fc-range" id="fc2-rng"></div></div>
+    <div class="forecast-card"><div class="fc-label">+3 Weeks</div><div class="fc-value" id="fc3-val">—</div><div class="fc-sub" id="fc3-sub"></div><div class="fc-change" id="fc3-chg"></div><div class="fc-range" id="fc3-rng"></div></div>
+    <div class="forecast-card"><div class="fc-label">+4 Weeks</div><div class="fc-value" id="fc4-val">—</div><div class="fc-sub" id="fc4-sub"></div><div class="fc-change" id="fc4-chg"></div><div class="fc-range" id="fc4-rng"></div></div>
+  </div>
+  <div class="card full-width">
+    <div class="card-title"><span class="dot"></span>STOCK LEVELS & FORECAST</div>
+    <div class="time-controls">
+      <button class="time-btn" data-range="6m">6M</button>
+      <button class="time-btn active" data-range="1y">1Y</button>
+      <button class="time-btn" data-range="2y">2Y</button>
+      <button class="time-btn" data-range="5y">5Y</button>
+      <button class="time-btn" data-range="all">ALL</button>
+      <div class="time-sep"></div>
+      <span class="date-label">From</span>
+      <input type="date" class="date-input" id="date-from">
+      <span class="date-label">To</span>
+      <input type="date" class="date-input" id="date-to">
+    </div>
+    <div class="chart-wrap main-chart"><canvas id="chart-main"></canvas></div>
+  </div>
+  <div class="card full-width">
+    <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>SEASONAL OVERLAY</div>
+    <div class="chart-wrap secondary-chart"><canvas id="chart-seasonal"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>MODEL PERFORMANCE</div>
+    <div class="metrics-grid">
+      <div class="metric-item"><div class="metric-label">Ensemble MAPE</div><div class="metric-value" id="m-mape">—</div></div>
+      <div class="metric-item"><div class="metric-label">Ensemble MAE</div><div class="metric-value" id="m-mae">—</div></div>
+      <div class="metric-item"><div class="metric-label">Direction Acc.</div><div class="metric-value" id="m-dir">—</div></div>
+      <div class="metric-item"><div class="metric-label">Seasonal Wt</div><div class="metric-value" id="m-w1">—</div></div>
+      <div class="metric-item"><div class="metric-label">Holt-Win Wt</div><div class="metric-value" id="m-w2">—</div></div>
+      <div class="metric-item"><div class="metric-label">S&D Reg Wt</div><div class="metric-value" id="m-w3">—</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>CROSS-PADD SNAPSHOT</div>
+    <div class="data-table-wrap">
+      <table><thead><tr><th>Region</th><th>Latest</th><th>Wk Chg</th><th>+1W Fcst</th><th>+4W Fcst</th><th>vs 5Y Avg</th></tr></thead><tbody id="padd-tbody"></tbody></table>
+    </div>
+  </div>
+  <div class="card full-width">
+    <div class="card-title"><span class="dot" style="background:var(--accent-pink)"></span>DETAILED FORECAST TABLE</div>
+    <div class="data-table-wrap">
+      <table><thead><tr><th>Week Ending</th><th>Ensemble</th><th>Chg</th><th>Low (80%)</th><th>High (80%)</th><th>Seasonal</th><th>Holt-Winters</th><th>S&D Reg</th></tr></thead><tbody id="detail-tbody"></tbody></table>
+    </div>
+  </div>
+  <div class="card full-width">
+    <div class="card-title"><span class="dot" style="background:var(--text-muted)"></span>ENGINE LOG</div>
+    <div class="log-wrap" id="log-wrap"></div>
+  </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const API_KEY = 'pMqnFqpdhwFV0XzZGK0G5ECuAqx1N4v68AxsRBkI';
+const BASE = 'https://api.eia.gov/v2';
+const TIMEOUT = 15000;
+const HIST_YEARS = 6;
+const FC_WEEKS = 4;
+const SEASON = 52;
+const VAL_WEEKS = 12;
+const PADDS = ['NUS','R10','R20','R30','R40','R50'];
+const PL = {NUS:'U.S. Total',R10:'PADD 1 (East Coast)',R20:'PADD 2 (Midwest)',R30:'PADD 3 (Gulf Coast)',R40:'PADD 4 (Rocky Mtn)',R50:'PADD 5 (West Coast)'};
+
+// Product definitions — each has its own fetch strategy
+const PRODUCTS = {
+  totalMotorGas: {
+    label: 'Total Motor Gasoline',
+    endpoint: 'stoc',  // uses /petroleum/stoc/wstk/
+    productCode: 'EPM0'
+  },
+  rbob: {
+    label: 'RBOB Blendstock',
+    endpoint: 'sndw',  // uses /petroleum/sum/sndw/ with process=SAE
+    productCode: 'EPOBGRR',
+    processCode: 'SAE'
+  },
+  cbob: {
+    label: 'CBOB Blendstock',
+    endpoint: 'sndw',
+    productCode: 'EPOBGCC',
+    processCode: 'SAE'
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════
+const logEl = document.getElementById('log-wrap');
+function log(m,t=''){const c=t==='ok'?'log-ok':t==='warn'?'log-warn':t==='err'?'log-err':'';logEl.innerHTML+=`<div class="${c}">[${new Date().toLocaleTimeString()}] ${m}</div>`;logEl.scrollTop=logEl.scrollHeight;}
+function setLoader(p,m){document.getElementById('loader-fill').style.width=p+'%';document.getElementById('loader-status').textContent=m;}
+function setStatus(s,t){const el=document.getElementById('status-pill');el.className='status-pill '+s;el.textContent=t;}
+
+// Smart number formatting — adapts to magnitude
+function fmtVal(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return (v/1e3).toFixed(1) + 'k';
+  if (a >= 1) return v.toFixed(1);
+  return v.toFixed(2);
+}
+function fmtChg(v) {
+  const sign = v >= 0 ? '+' : '';
+  const a = Math.abs(v);
+  if (a >= 1e6) return sign + (v/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return sign + (v/1e3).toFixed(1) + 'k';
+  if (a >= 1) return sign + v.toFixed(1);
+  return sign + v.toFixed(2);
+}
+// Y-axis tick formatter — auto-detects scale
+function yTickFmt(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v/1e6).toFixed(0) + 'M';
+  if (a >= 1e4) return (v/1e3).toFixed(0) + 'k';
+  if (a >= 1e3) return (v/1e3).toFixed(1) + 'k';
+  return v.toFixed(0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FETCH WITH TIMEOUT
+// ═══════════════════════════════════════════════════════════
+const cache = {};
+async function tfetch(url, timeout=TIMEOUT) {
+  if (cache[url]) return cache[url];
+  const ac = new AbortController();
+  const tm = setTimeout(()=>ac.abort(), timeout);
+  try {
+    const r = await fetch(url, {signal:ac.signal});
+    clearTimeout(tm);
+    if (!r.ok) { log(`HTTP ${r.status}`, 'warn'); return null; }
+    const j = await r.json();
+    cache[url] = j;
+    return j;
+  } catch(e) {
+    clearTimeout(tm);
+    if (e.name==='AbortError') log(`Timeout (${timeout/1000}s)`, 'warn');
+    else log(`Fetch error: ${e.message}`, 'warn');
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATA SERVICE
+// ═══════════════════════════════════════════════════════════
+function sdate() {
+  const d = new Date(); d.setFullYear(d.getFullYear()-HIST_YEARS);
+  return d.toISOString().split('T')[0];
+}
+
+// Build URL for Total Motor Gas (stoc/wstk endpoint)
+function stocUrl(productCode) {
+  let u = `${BASE}/petroleum/stoc/wstk/data/?api_key=${API_KEY}`;
+  u += `&frequency=weekly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc`;
+  u += `&start=${sdate()}&length=5000&facets[product][]=${productCode}`;
+  PADDS.forEach(a => u += `&facets[duoarea][]=${a}`);
+  return u;
+}
+
+// Build URL for RBOB/CBOB (sum/sndw endpoint with process=SAE)
+function sndwStockUrl(productCode, processCode) {
+  let u = `${BASE}/petroleum/sum/sndw/data/?api_key=${API_KEY}`;
+  u += `&frequency=weekly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc`;
+  u += `&start=${sdate()}&length=5000`;
+  u += `&facets[product][]=${productCode}`;
+  u += `&facets[process][]=${processCode}`;
+  PADDS.forEach(a => u += `&facets[duoarea][]=${a}`);
+  return u;
+}
+
+function extractSeries(resp, area) {
+  if (!resp?.response?.data) return [];
+  return resp.response.data
+    .filter(d => d.duoarea === area && d.value != null)
+    .map(d => ({date: d.period, value: parseFloat(d.value)}))
+    .sort((a,b) => a.date.localeCompare(b.date));
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════════════════
+function weekOfYear(ds){const d=new Date(ds),s=new Date(d.getFullYear(),0,1);return Math.ceil(((d-s)/864e5+s.getDay()+1)/7);}
+
+function seasonalNaive(series,horizon){
+  const n=series.length;if(n<104)return null;
+  let ts=0,tc=0;
+  for(let y=1;y<=3;y++){const i=n-y*SEASON,ip=n-(y+1)*SEASON;if(ip>=0){ts+=series[i].value-series[ip].value;tc++;}}
+  const trend=tc>0?ts/tc:0;
+  return Array.from({length:horizon},(_,h)=>{const si=n-SEASON+h;return si>=0?series[si].value+trend:series[n-1].value;});
+}
+
+function holtWinters(series,horizon){
+  const n=series.length;if(n<SEASON*2)return null;
+  const v=series.map(d=>d.value);
+  const gm=v.slice(0,SEASON*2).reduce((a,b)=>a+b,0)/(SEASON*2);
+  const sea=Array.from({length:SEASON},(_,i)=>{const s1=v[i]||0,s2=v[i+SEASON]||s1;return(s1+s2)/2-gm;});
+  let bA=.3,bB=.01,bG=.1,bE=Infinity;
+  for(let a=.05;a<=.5;a+=.1)for(let b=.001;b<=.05;b+=.01)for(let g=.01;g<=.3;g+=.07){
+    const e=hwErr(v,a,b,g,[...sea],8);if(e<bE){bE=e;bA=a;bB=b;bG=g;}}
+  const s=[...sea];let lv=v.slice(0,SEASON).reduce((a,b)=>a+b,0)/SEASON,tr=0;
+  for(let i=0;i<SEASON&&(i+SEASON)<v.length;i++)tr+=(v[i+SEASON]-v[i]);
+  tr/=(SEASON*SEASON);
+  for(let t=0;t<n;t++){const p=lv,si=t%SEASON;lv=bA*(v[t]-s[si])+(1-bA)*(p+tr);tr=bB*(lv-p)+(1-bB)*tr;s[si]=bG*(v[t]-lv)+(1-bG)*s[si];}
+  return Array.from({length:horizon},(_,h)=>lv+tr*(h+1)+s[(n+h)%SEASON]);
+}
+function hwErr(v,a,b,g,sea,vw){
+  const n=v.length;let lv=v.slice(0,SEASON).reduce((a,b)=>a+b,0)/SEASON,tr=0;
+  for(let i=0;i<SEASON&&(i+SEASON)<v.length;i++)tr+=(v[i+SEASON]-v[i]);tr/=(SEASON*SEASON);
+  const s=[...sea],te=n-vw;
+  for(let t=0;t<te;t++){const p=lv,si=t%SEASON;lv=a*(v[t]-s[si])+(1-a)*(p+tr);tr=b*(lv-p)+(1-b)*tr;s[si]=g*(v[t]-lv)+(1-g)*s[si];}
+  let e=0;for(let h=1;h<=vw;h++){if(!v[te+h-1])continue;e+=Math.abs(lv+tr*h+s[(te+h-1)%SEASON]-v[te+h-1]);}return e/vw;
+}
+
+function sdRegression(series,sdF,horizon){
+  const n=series.length;if(n<20)return null;const v=series.map(d=>d.value);
+  const rows=[],tgts=[];
+  for(let t=1;t<n;t++){
+    const wk=weekOfYear(series[t].date);
+    const f=[Math.sin(2*Math.PI*wk/52),Math.cos(2*Math.PI*wk/52)];
+    for(const k of['production','imports','exports','demand']){const d=sdF[k];f.push(d&&d.length>t?(d[t].value||0):0);}
+    f.push(v[t]-v[t-1]);rows.push(f);if(t<n-1)tgts.push(v[t+1]-v[t]);
+  }
+  if(tgts.length<20)return null;
+  const X=rows.slice(0,tgts.length),c=ols(X,tgts);if(!c)return null;
+  const fc=[];let last=v[n-1],lc=v[n-1]-v[n-2];
+  for(let h=1;h<=horizon;h++){
+    const fd=new Date(series[n-1].date);fd.setDate(fd.getDate()+7*h);
+    const wk=weekOfYear(fd.toISOString().split('T')[0]);
+    const f=[Math.sin(2*Math.PI*wk/52),Math.cos(2*Math.PI*wk/52)];
+    for(const k of['production','imports','exports','demand']){const d=sdF[k];f.push(d&&d.length>0?(d[d.length-1].value||0):0);}
+    f.push(lc);let p=c[0];for(let j=0;j<f.length;j++)p+=c[j+1]*f[j];
+    last+=p;lc=p;fc.push(last);
+  }
+  return fc;
+}
+function ols(X,y){
+  const n=X.length,p=X[0].length,pp=p+1;const Xa=X.map(r=>[1,...r]);
+  const XtX=Array.from({length:pp},()=>new Array(pp).fill(0)),Xty=new Array(pp).fill(0);
+  for(let i=0;i<n;i++)for(let j=0;j<pp;j++){Xty[j]+=Xa[i][j]*y[i];for(let k=0;k<pp;k++)XtX[j][k]+=Xa[i][j]*Xa[i][k];}
+  for(let j=0;j<pp;j++)XtX[j][j]+=.01;const aug=XtX.map((r,i)=>[...r,Xty[i]]);
+  for(let c=0;c<pp;c++){let mr=c;for(let r=c+1;r<pp;r++)if(Math.abs(aug[r][c])>Math.abs(aug[mr][c]))mr=r;
+  [aug[c],aug[mr]]=[aug[mr],aug[c]];if(Math.abs(aug[c][c])<1e-10)return null;
+  for(let r=c+1;r<pp;r++){const f=aug[r][c]/aug[c][c];for(let j=c;j<=pp;j++)aug[r][j]-=f*aug[c][j];}}
+  const co=new Array(pp);for(let i=pp-1;i>=0;i--){co[i]=aug[i][pp];for(let j=i+1;j<pp;j++)co[i]-=aug[i][j]*co[j];co[i]/=aug[i][i];}return co;
+}
+
+function runEnsemble(series,sdF,horizon){
+  const m1=seasonalNaive(series,horizon),m2=holtWinters(series,horizon),m3=sdRegression(series,sdF,horizon);
+  const w=calcWeights(series,sdF);
+  log(`Ensemble wts — Seasonal:${(w[0]*100).toFixed(0)}% HW:${(w[1]*100).toFixed(0)}% S&D:${(w[2]*100).toFixed(0)}%`);
+  const fc=[];
+  for(let h=0;h<horizon;h++){let ws=0,vs=0;
+    if(m1){vs+=w[0]*m1[h];ws+=w[0];}if(m2){vs+=w[1]*m2[h];ws+=w[1];}if(m3){vs+=w[2]*m3[h];ws+=w[2];}
+    fc.push(ws>0?vs/ws:series[series.length-1].value);}
+  const ci=calcCI(series);
+  return{ensemble:fc,seasonal:m1||fc,holtWinters:m2||fc,sdReg:m3||fc,weights:w,ciLow:ci.low,ciHigh:ci.high,metrics:ci.metrics};
+}
+function calcWeights(series,sdF){
+  const n=series.length,vw=Math.min(VAL_WEEKS,Math.floor(n*.1));if(vw<2)return[.5,.5,0];
+  const errs=[0,0,0],cnts=[0,0,0];
+  for(let w=1;w<=vw;w++){
+    const sub=series.slice(0,n-vw+w-1),act=series[n-vw+w-1].value;
+    const a=seasonalNaive(sub,1),b=holtWinters(sub,1);
+    const sdSub={};for(const k of Object.keys(sdF))if(sdF[k])sdSub[k]=sdF[k].slice(0,n-vw+w-1);
+    const c=sdRegression(sub,sdSub,1);
+    if(a){errs[0]+=Math.abs(a[0]-act);cnts[0]++;}if(b){errs[1]+=Math.abs(b[0]-act);cnts[1]++;}if(c){errs[2]+=Math.abs(c[0]-act);cnts[2]++;}
+  }
+  const maes=errs.map((e,i)=>cnts[i]>0?e/cnts[i]:Infinity);const inv=maes.map(m=>m>0&&isFinite(m)?1/m:0);
+  const tot=inv.reduce((a,b)=>a+b,0);return tot===0?[.5,.5,0]:inv.map(v=>v/tot);
+}
+function calcCI(series){
+  const n=series.length,vw=Math.min(VAL_WEEKS,Math.floor(n*.1));
+  const ch=[];for(let i=1;i<n;i++)ch.push(series[i].value-series[i-1].value);
+  const mn=ch.reduce((a,b)=>a+b,0)/ch.length;const std=Math.sqrt(ch.reduce((a,b)=>a+(b-mn)**2,0)/ch.length);
+  let mape=0,mae=0,dOk=0,dN=0;
+  for(let w=1;w<=vw;w++){const sub=series.slice(0,n-vw+w-1),act=series[n-vw+w-1].value;
+    const m=seasonalNaive(sub,1);if(m){const e=Math.abs(m[0]-act);mae+=e;mape+=(e/Math.abs(act))*100;
+    if(w>1){if((m[0]>sub[sub.length-1].value)===(act>series[n-vw+w-2].value))dOk++;dN++;}}}
+  const low=[],high=[];for(let h=1;h<=FC_WEEKS;h++){const s=1.28*std*Math.sqrt(h);low.push(-s);high.push(s);}
+  return{low,high,metrics:{mape:vw>0?(mape/vw).toFixed(2)+'%':'—',mae:vw>0?fmtVal(mae/vw):'—',dirAcc:dN>0?(dOk/dN*100).toFixed(0)+'%':'—'}};
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+let mainChart, seasonalChart;
+const CC={history:'#58a6ff',forecast:'#39d2c0',ciBand:'rgba(57,210,192,0.1)',ciBorder:'rgba(57,210,192,0.25)',seasonal:'#bc8cff',hw:'#f778ba',sdreg:'#d29922'};
+
+// Crosshair line plugin — draws vertical line at hover position
+const crosshairPlugin = {
+  id: 'crosshair',
+  afterDraw(chart) {
+    if (chart.tooltip?._active?.length) {
+      const x = chart.tooltip._active[0].element.x;
+      const yAxis = chart.scales.y;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, yAxis.top);
+      ctx.lineTo(x, yAxis.bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(139,148,158,0.3)';
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
+Chart.register(crosshairPlugin);
+
+// Shared tooltip styling
+const tooltipStyle = {
+  backgroundColor: 'rgba(13,17,23,0.95)',
+  titleColor: '#e6edf3',
+  bodyColor: '#8b949e',
+  titleFont: { family: 'JetBrains Mono', size: 12, weight: '600' },
+  bodyFont: { family: 'JetBrains Mono', size: 11 },
+  borderColor: '#30363d',
+  borderWidth: 1,
+  padding: 12,
+  cornerRadius: 6,
+  boxPadding: 4,
+  usePointStyle: true,
+  pointStyleWidth: 8
+};
+
+// Current chart view state
+let chartViewRange = '1y';
+let chartCustomFrom = null;
+let chartCustomTo = null;
+
+function getChartCutoff(series) {
+  if (chartCustomFrom) return new Date(chartCustomFrom);
+  const now = new Date();
+  switch (chartViewRange) {
+    case '6m': now.setMonth(now.getMonth() - 6); return now;
+    case '1y': now.setFullYear(now.getFullYear() - 1); return now;
+    case '2y': now.setFullYear(now.getFullYear() - 2); return now;
+    case '5y': now.setFullYear(now.getFullYear() - 5); return now;
+    case 'all': return new Date(series[0].date);
+    default: now.setFullYear(now.getFullYear() - 1); return now;
+  }
+}
+
+function renderMainChart(series, fc) {
+  const ctx = document.getElementById('chart-main').getContext('2d');
+  if (mainChart) mainChart.destroy();
+
+  const cut = getChartCutoff(series);
+  const hist = series.filter(d => new Date(d.date) >= cut).map(d => ({x: d.date, y: d.value}));
+  const ld = new Date(series[series.length-1].date);
+  const fds = Array.from({length: FC_WEEKS}, (_, h) => {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    return d.toISOString().split('T')[0];
+  });
+  const br = {x: series[series.length-1].date, y: series[series.length-1].value};
+
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets: [
+      {label:'80% CI', data:[br,...fc.ensemble.map((v,i)=>({x:fds[i],y:v+fc.ciHigh[i]}))], fill:'+1', backgroundColor:CC.ciBand, borderColor:CC.ciBorder, borderWidth:1, pointRadius:0, borderDash:[3,3], order:5},
+      {label:'CI Lower', data:[br,...fc.ensemble.map((v,i)=>({x:fds[i],y:v+fc.ciLow[i]}))], fill:false, borderColor:CC.ciBorder, borderWidth:1, pointRadius:0, borderDash:[3,3], order:5},
+      {label:'Historical', data:hist, borderColor:CC.history, backgroundColor:CC.history+'15', borderWidth:2, pointRadius:0, fill:true, tension:.1, order:2},
+      {label:'Ensemble', data:[br,...fc.ensemble.map((v,i)=>({x:fds[i],y:v}))],
+        borderColor:CC.forecast, borderWidth:2.5,
+        pointRadius: [0, 3, 3, 3, 3],
+        pointHoverRadius: 5,
+        pointBackgroundColor: CC.forecast,
+        pointBorderColor: '#0d1117',
+        pointBorderWidth: 1.5,
+        tension:0, order:1},
+      {label:'Seasonal', data:[br,...fc.seasonal.map((v,i)=>({x:fds[i],y:v}))], borderColor:CC.seasonal, borderWidth:1.5, pointRadius:0, borderDash:[5,5], tension:0, order:3},
+      {label:'Holt-Winters', data:[br,...fc.holtWinters.map((v,i)=>({x:fds[i],y:v}))], borderColor:CC.hw, borderWidth:1.5, pointRadius:0, borderDash:[5,5], tension:0, order:3},
+      {label:'S&D Reg', data:[br,...fc.sdReg.map((v,i)=>({x:fds[i],y:v}))], borderColor:CC.sdreg, borderWidth:1.5, pointRadius:0, borderDash:[5,5], tension:0, order:3}
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: {
+        legend: { labels: { color:'#8b949e', font:{family:'JetBrains Mono',size:11}, boxWidth:12, padding:16, filter: i => i.text!=='CI Lower' }},
+        tooltip: {
+          ...tooltipStyle,
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false,
+          filter: item => item.dataset.label !== 'CI Lower' && item.dataset.label !== '80% CI',
+          callbacks: {
+            title: items => {
+              if (!items.length) return '';
+              // Use the time scale to get a proper date string
+              const raw = items[0].raw;
+              return raw?.x || '';
+            },
+            label: c => {
+              const val = c.parsed.y;
+              if (val == null) return '';
+              return ` ${c.dataset.label}: ${val.toLocaleString(undefined, {maximumFractionDigits: 1})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {type:'time', time:{unit:'month',tooltipFormat:'MMM dd, yyyy'}, grid:{color:'rgba(33,38,45,0.8)'}, ticks:{color:'#484f58',font:{family:'JetBrains Mono',size:10},maxRotation:0}},
+        y: {grid:{color:'rgba(33,38,45,0.8)'}, ticks:{color:'#484f58',font:{family:'JetBrains Mono',size:10},callback:yTickFmt}}
+      }
+    }
+  });
+
+  // Sync date pickers to current view
+  if (!chartCustomFrom) {
+    document.getElementById('date-from').value = cut.toISOString().split('T')[0];
+    document.getElementById('date-to').value = fds[fds.length - 1];
+  }
+}
+
+// Seasonal chart — explicit color mapping for every year
+const YEAR_COLORS = {
+  2020: '#f47067',  // bright coral red
+  2021: '#e0823d',  // warm orange
+  2022: '#d29922',  // gold
+  2023: '#bc8cff',  // purple
+  2024: '#58a6ff',  // blue
+  2025: '#f778ba',  // pink
+  2026: '#39d2c0',  // teal (current year)
+};
+const FALLBACK_COLORS = ['#6e7681','#8b949e','#484f58','#a5d6ff','#7ee787'];
+
+function renderSeasonalChart(series) {
+  const ctx = document.getElementById('chart-seasonal').getContext('2d');
+  if (seasonalChart) seasonalChart.destroy();
+
+  const currentYear = new Date().getFullYear();
+  const datasets = [];
+
+  // Snap every date to its week number (1–52) so all years align to the same x grid
+  function toWeekNum(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const jan1 = new Date(d.getFullYear(), 0, 1, 12, 0, 0);
+    const doy = Math.floor((d - jan1) / 86400000) + 1;
+    return Math.min(52, Math.ceil(doy / 7)); // clamp to 52 max
+  }
+
+  const yearsInData = new Set();
+  for (const d of series) yearsInData.add(parseInt(d.date.substring(0, 4)));
+  const years = [...yearsInData].sort();
+  let fallbackIdx = 0;
+
+  for (const yr of years) {
+    const yrData = series.filter(d => d.date.startsWith(String(yr)));
+    if (yrData.length < 4) continue;
+
+    const points = yrData.map(d => ({
+      x: toWeekNum(d.date),
+      y: d.value
+    })).sort((a, b) => a.x - b.x);
+
+    // Deduplicate: if two points land on the same week, keep the last one
+    const deduped = [];
+    for (const p of points) {
+      if (deduped.length > 0 && deduped[deduped.length-1].x === p.x) {
+        deduped[deduped.length-1] = p;
+      } else {
+        deduped.push(p);
+      }
+    }
+
+    const isCurrent = (yr === currentYear);
+    const color = YEAR_COLORS[yr] || FALLBACK_COLORS[fallbackIdx++ % FALLBACK_COLORS.length];
+
+    datasets.push({
+      label: String(yr),
+      data: deduped,
+      borderColor: color,
+      borderWidth: isCurrent ? 3 : 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.3,
+      borderDash: isCurrent ? [] : [4, 4]
+    });
+  }
+
+  // Map week numbers to month labels
+  // Week 1=Jan1-7, Week 5≈Feb, Week 9≈Mar, etc.
+  const MONTH_WEEKS = [1, 5, 9, 14, 18, 22, 27, 31, 35, 40, 44, 48];
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  seasonalChart = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: {
+        legend: { labels: { color:'#8b949e', font:{family:'JetBrains Mono',size:10}, boxWidth:10, padding:12, usePointStyle:true }},
+        tooltip: {
+          ...tooltipStyle,
+          mode: 'nearest',
+          axis: 'x',
+          intersect: false,
+          callbacks: {
+            title: items => {
+              if (!items.length) return '';
+              const wk = Math.round(items[0].parsed.x);
+              // Convert week → approximate month + day
+              const doy = (wk - 1) * 7 + 4; // midpoint of the week
+              let mIdx = 0;
+              const mStarts = [1,32,60,91,121,152,182,213,244,274,305,335];
+              for (let i = mStarts.length - 1; i >= 0; i--) {
+                if (doy >= mStarts[i]) { mIdx = i; break; }
+              }
+              const dayInMonth = Math.max(1, doy - mStarts[mIdx] + 1);
+              return `~${MONTH_NAMES[mIdx]} ${dayInMonth}  (Week ${wk})`;
+            },
+            label: c => {
+              const val = c.parsed.y;
+              if (val == null) return '';
+              return ` ${c.dataset.label}: ${val.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 1, max: 52,
+          grid: { color: 'rgba(33,38,45,0.8)' },
+          ticks: {
+            color: '#484f58',
+            font: { family: 'JetBrains Mono', size: 10 },
+            autoSkip: false,
+            callback: function(v) {
+              const idx = MONTH_WEEKS.indexOf(v);
+              return idx >= 0 ? MONTH_NAMES[idx] : '';
+            },
+            maxRotation: 0
+          },
+          afterBuildTicks: function(axis) {
+            axis.ticks = MONTH_WEEKS.map(v => ({ value: v }));
+          }
+        },
+        y: {
+          grid: { color: 'rgba(33,38,45,0.8)' },
+          ticks: { color: '#484f58', font: { family: 'JetBrains Mono', size: 10 }, callback: yTickFmt }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════
+const APP = {
+  rawData: {},
+  currentSeries: null,
+  currentFc: null,
+
+  async init() {
+    log('Gasoline Stock Prediction Engine v2.3', 'ok');
+    log('RBOB/CBOB: using /petroleum/sum/sndw with process=SAE (Stocks at End)', 'ok');
+    log('Total Motor Gas: using /petroleum/stoc/wstk', 'ok');
+
+    // Load all products
+    setLoader(10, 'Loading stock data...');
+
+    for (const [key, cfg] of Object.entries(PRODUCTS)) {
+      log(`Loading ${cfg.label}...`);
+      let url;
+      if (cfg.endpoint === 'stoc') {
+        url = stocUrl(cfg.productCode);
+      } else {
+        url = sndwStockUrl(cfg.productCode, cfg.processCode);
+      }
+      log(`  URL: .../${cfg.endpoint}/... product=${cfg.productCode}${cfg.processCode ? ' process='+cfg.processCode : ''}`);
+
+      const r = await tfetch(url);
+      const n = r?.response?.data?.length || 0;
+      if (n > 0) {
+        // Quick sanity: check one PADD
+        const testSeries = extractSeries(r, 'NUS');
+        const nonZero = testSeries.filter(d => d.value !== 0).length;
+        log(`  ✓ ${n} records, NUS series: ${testSeries.length} weeks (${nonZero} non-zero)`, 'ok');
+        if (testSeries.length > 0) {
+          const sample = testSeries.slice(-3).map(d => `${d.date}=${d.value}`).join(', ');
+          log(`  Sample (latest 3): ${sample}`);
+        }
+        this.rawData[key] = r;
+      } else {
+        log(`  ✗ No data returned`, 'warn');
+      }
+    }
+
+    const loaded = Object.keys(this.rawData).length;
+    log(`Products loaded: ${loaded}/${Object.keys(PRODUCTS).length}`, loaded > 0 ? 'ok' : 'err');
+
+    if (loaded === 0) {
+      log('FATAL: No data loaded. Check API key.', 'err');
+      setLoader(100, 'No data — check log');
+      setStatus('error', 'NO DATA');
+      setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 1500);
+      return;
+    }
+
+    // Run initial forecast
+    setLoader(80, 'Running forecast...');
+    this.runForecast();
+
+    setLoader(100, 'Done.');
+    setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); setStatus('ready', 'READY'); }, 500);
+
+    document.getElementById('btn-run').addEventListener('click', () => this.runForecast());
+    document.getElementById('sel-product').addEventListener('change', () => this.runForecast());
+    document.getElementById('sel-padd').addEventListener('change', () => this.runForecast());
+
+    // Refresh Data — clears cache, re-fetches from EIA, re-runs forecast
+    document.getElementById('btn-refresh').addEventListener('click', async () => {
+      log('─── Refreshing data from EIA... ───', 'ok');
+      setStatus('loading', 'REFRESHING...');
+      // Clear fetch cache so we get fresh data
+      for (const key in cache) delete cache[key];
+      this.rawData = {};
+      this.currentSeries = null;
+      this.currentFc = null;
+      for (const [key, cfg] of Object.entries(PRODUCTS)) {
+        log(`Reloading ${cfg.label}...`);
+        const url = cfg.endpoint === 'stoc' ? stocUrl(cfg.productCode) : sndwStockUrl(cfg.productCode, cfg.processCode);
+        const r = await tfetch(url);
+        const n = r?.response?.data?.length || 0;
+        if (n > 0) {
+          this.rawData[key] = r;
+          const testSeries = extractSeries(r, 'NUS');
+          log(`  ✓ ${cfg.label}: ${testSeries.length} weeks, latest: ${testSeries.length > 0 ? testSeries[testSeries.length-1].date : '?'}`, 'ok');
+        } else {
+          log(`  ✗ ${cfg.label}: no data`, 'warn');
+        }
+      }
+      this.runForecast();
+      log('✓ Data refreshed', 'ok');
+    });
+
+    // Time range controls
+    document.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        chartViewRange = btn.dataset.range;
+        chartCustomFrom = null;
+        chartCustomTo = null;
+        if (this.currentSeries && this.currentFc) {
+          renderMainChart(this.currentSeries, this.currentFc);
+        }
+      });
+    });
+    document.getElementById('date-from').addEventListener('change', (e) => {
+      chartCustomFrom = e.target.value;
+      document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+    });
+    document.getElementById('date-to').addEventListener('change', (e) => {
+      chartCustomTo = e.target.value;
+      document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+    });
+  },
+
+  runForecast() {
+    const pk = document.getElementById('sel-product').value;
+    const padd = document.getElementById('sel-padd').value;
+    setStatus('loading', 'FORECASTING...');
+    log(`─── ${PRODUCTS[pk].label} / ${PL[padd]} ───`);
+
+    const api = this.rawData[pk];
+    if (!api) { log('No data for this product', 'err'); setStatus('error', 'NO DATA'); return; }
+
+    const series = extractSeries(api, padd);
+    if (series.length < 20) { log(`Only ${series.length} weeks, need 20+`, 'err'); setStatus('error', 'INSUFFICIENT'); return; }
+    log(`${series.length} weeks (${series[0].date} → ${series[series.length-1].date})`);
+
+    // No S&D features for now — ensemble uses seasonal + HW + sd-regression with seasonality only
+    const sdF = {};
+    const fc = runEnsemble(series, sdF, FC_WEEKS);
+    const last = series[series.length-1].value;
+
+    // Forecast cards
+    for (let h = 0; h < 4; h++) {
+      const v = fc.ensemble[h], ch = v - last, pct = (ch / last) * 100;
+      document.getElementById(`fc${h+1}-val`).textContent = fmtVal(v);
+      document.getElementById(`fc${h+1}-sub`).textContent = v.toLocaleString(undefined, {maximumFractionDigits:0}) + ' kbbl';
+      const el = document.getElementById(`fc${h+1}-chg`);
+      el.textContent = `${fmtChg(ch)} (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)`;
+      el.className = 'fc-change ' + (ch >= 0 ? 'up' : 'down');
+      document.getElementById(`fc${h+1}-rng`).textContent = `80% CI: ${fmtVal(v+fc.ciLow[h])} – ${fmtVal(v+fc.ciHigh[h])}`;
+    }
+
+    // Metrics
+    document.getElementById('m-mape').textContent = fc.metrics.mape;
+    document.getElementById('m-mae').textContent = fc.metrics.mae;
+    document.getElementById('m-dir').textContent = fc.metrics.dirAcc;
+    document.getElementById('m-w1').textContent = (fc.weights[0] * 100).toFixed(0) + '%';
+    document.getElementById('m-w2').textContent = (fc.weights[1] * 100).toFixed(0) + '%';
+    document.getElementById('m-w3').textContent = (fc.weights[2] * 100).toFixed(0) + '%';
+
+    // Detail table
+    const dt = document.getElementById('detail-tbody');
+    const ld = new Date(series[series.length-1].date);
+    let dr = '';
+    for (let h = 0; h < FC_WEEKS; h++) {
+      const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+      const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h-1], ch = e - pv;
+      dr += `<tr><td>${d.toISOString().split('T')[0]}</td>
+        <td>${fmtVal(e)}</td>
+        <td class="${ch >= 0 ? 'positive' : 'negative'}">${fmtChg(ch)}</td>
+        <td>${fmtVal(e + fc.ciLow[h])}</td><td>${fmtVal(e + fc.ciHigh[h])}</td>
+        <td>${fmtVal(fc.seasonal[h])}</td><td>${fmtVal(fc.holtWinters[h])}</td>
+        <td>${fmtVal(fc.sdReg[h])}</td></tr>`;
+    }
+    dt.innerHTML = dr;
+
+    // PADD table
+    const pt = document.getElementById('padd-tbody');
+    let pr = '';
+    for (const p of PADDS) {
+      const s = extractSeries(api, p);
+      if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
+      const lt = s[s.length-1].value, pv = s[s.length-2].value, wc = lt - pv;
+      let f1 = lt, f4 = lt;
+      try { const f = runEnsemble(s, {}, 4); f1 = f.ensemble[0]; f4 = f.ensemble[3]; } catch(e) {}
+      const wk = weekOfYear(s[s.length-1].date), yr = parseInt(s[s.length-1].date.substring(0, 4));
+      let a5 = 0, c5 = 0;
+      for (const d of s) { const dy = parseInt(d.date.substring(0, 4)); if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; } }
+      a5 = c5 > 0 ? a5 / c5 : lt; const v5 = lt - a5;
+      pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
+        <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
+        <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
+        <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
+    }
+    pt.innerHTML = pr;
+
+    // Charts
+    this.currentSeries = series;
+    this.currentFc = fc;
+    renderMainChart(series, fc);
+    renderSeasonalChart(series);
+
+    log('✓ Forecast complete', 'ok');
+    setStatus('ready', 'READY');
+  }
+};
+
+// BOOT
+window.addEventListener('DOMContentLoaded', () => {
+  APP.init().catch(err => {
+    log('FATAL: ' + err.message, 'err'); console.error(err);
+    setLoader(100, 'Error — see log'); setStatus('error', 'ERROR');
+    setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 1500);
+  });
+});
+</script>
+</body>
+</html>
