@@ -888,8 +888,50 @@ function alignSD(sdKey, stockDates) {
   return result;
 }
 
+// Estimate PADD-level demand by proportioning national demand using stock share.
+// EIA only publishes weekly demand at the US-total level, so we approximate
+// each PADD's demand based on its fraction of national gasoline stocks.
+function estimatePaddDemand(padd, stockDates, paddSeries) {
+  const nationalDemand = alignSD('demand_MOGAS_NUS', stockDates);
+  if (!nationalDemand) return null;
+
+  // Get US-total stock series to compute PADD's share
+  // We need the NUS stock data — pull from the app's rawData via extractSeries
+  const app = window.__app;
+  if (!app || !app.rawData) return null;
+  const productKey = document.getElementById('sel-product').value;
+  const nusRaw = app.rawData[productKey];
+  if (!nusRaw) return null;
+  const nusSeries = extractSeries(nusRaw, 'NUS');
+  if (!nusSeries || nusSeries.length < 52) return null;
+
+  // Build date-indexed maps for both series
+  const nusMap = {};
+  nusSeries.forEach(d => nusMap[d.date] = d.value);
+
+  // Compute rolling PADD share of national stocks (26-week average for stability)
+  const SHARE_WINDOW = 26;
+  const shares = [];
+  for (let i = 0; i < paddSeries.length; i++) {
+    const nusVal = nusMap[paddSeries[i].date];
+    if (nusVal && nusVal > 0 && paddSeries[i].value > 0) {
+      shares.push(paddSeries[i].value / nusVal);
+    }
+  }
+  if (shares.length < 10) return null;
+
+  // Use average of recent shares (more stable than single-point)
+  const recentShares = shares.slice(-SHARE_WINDOW);
+  const avgShare = recentShares.reduce((a, b) => a + b, 0) / recentShares.length;
+
+  // Scale national demand by PADD share
+  const paddDemand = nationalDemand.map(v => v != null ? v * avgShare : null);
+  log(`  PADD demand est: ${(avgShare * 100).toFixed(1)}% of national`, 'ok');
+  return paddDemand;
+}
+
 // Build S&D features object for a given PADD
-function buildSDFeatures(padd, stockDates) {
+function buildSDFeatures(padd, stockDates, paddSeries) {
   const sdF = {};
   // Production — use MOGAS (finished motor gasoline) for NUS, or REFORM for PADDs
   const prodKey = `production_MOGAS_${padd}`;
@@ -903,8 +945,12 @@ function buildSDFeatures(padd, stockDates) {
   // Exports — total motor gasoline
   sdF.exports = alignSD(`trade_MOGAS_EXP_${padd}`, stockDates);
 
-  // Demand — NUS only
-  sdF.demand = alignSD('demand_MOGAS_NUS', stockDates);
+  // Demand — PADD-level estimation when not US total
+  if (padd === 'NUS') {
+    sdF.demand = alignSD('demand_MOGAS_NUS', stockDates);
+  } else {
+    sdF.demand = estimatePaddDemand(padd, stockDates, paddSeries);
+  }
 
   // Utilization
   sdF.utilization = alignSD(`refinery_UTIL_${padd}`, stockDates);
@@ -1241,7 +1287,9 @@ function sdBalanceModel(series, sdF, horizon) {
   const v = series.map(d => d.value);
 
   const prod = sdF.production, imp = sdF.imports, exp = sdF.exports, dem = sdF.demand;
-  if (!prod && !dem) return null;
+  // Need at least 2 S&D components for a meaningful balance
+  const availableComponents = [prod, imp, exp, dem].filter(c => c != null).length;
+  if (availableComponents < 2) return null;
 
   // Calibration: S&D balance vs actual stock change (last 26 weeks)
   const calWindow = Math.min(26, n - 1);
@@ -2259,7 +2307,7 @@ function exportCSV(series, fc) {
 // ═══════════════════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════════════════
-const APP = {
+const APP = window.__app = {
   rawData: {},
   currentSeries: null,
   currentFc: null,
@@ -2585,7 +2633,7 @@ const APP = {
       const t0 = performance.now();
       const padd = document.getElementById('sel-padd').value;
       const stockDates = this.currentSeries.map(d => d.date);
-      const sdF = buildSDFeatures(padd, stockDates);
+      const sdF = buildSDFeatures(padd, stockDates, this.currentSeries);
       const results = runBacktest(this.currentSeries, horizon, windowSize, sdF);
       const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
       log(`Backtest complete: ${results.length} predictions in ${elapsed}s`, 'ok');
@@ -2646,7 +2694,7 @@ const APP = {
 
     // v4: Build real S&D features aligned to this series
     const stockDates = series.map(d => d.date);
-    const sdF = buildSDFeatures(padd, stockDates);
+    const sdF = buildSDFeatures(padd, stockDates, series);
     const sdCount = countSDFeatures(sdF);
     log(`S&D features for ${PL[padd]}: ${sdCount}/8 available`);
 
