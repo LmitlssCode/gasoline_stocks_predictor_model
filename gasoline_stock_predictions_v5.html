@@ -1095,7 +1095,7 @@ function holtWinters(series, horizon) {
   let lv = v.slice(0, SEASON).reduce((a, b) => a + b, 0) / SEASON;
   let tr = 0;
   for (let i = 0; i < SEASON && (i + SEASON) < v.length; i++) tr += (v[i + SEASON] - v[i]);
-  tr /= SEASON;
+  tr /= (SEASON * SEASON);
   for (let t = 0; t < n; t++) {
     const p = lv, si = t % SEASON;
     lv = bA * (v[t] - s[si]) + (1 - bA) * (p + tr);
@@ -1109,7 +1109,7 @@ function hwErr(v, a, b, g, sea, vw) {
   const n = v.length;
   let lv = v.slice(0, SEASON).reduce((a, b) => a + b, 0) / SEASON, tr = 0;
   for (let i = 0; i < SEASON && (i + SEASON) < v.length; i++) tr += (v[i + SEASON] - v[i]);
-  tr /= SEASON;
+  tr /= (SEASON * SEASON);
   const s = [...sea], te = n - vw;
   for (let t = 0; t < te; t++) {
     const p = lv, si = t % SEASON;
