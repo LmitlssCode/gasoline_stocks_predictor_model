@@ -18,7 +18,7 @@
   --border-accent: #30363d;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
-  --text-muted: #6e7681;
+  --text-muted: #8b949e;
   --accent-blue: #58a6ff;
   --accent-green: #3fb950;
   --accent-red: #f85149;
@@ -618,8 +618,8 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
           <div class="adj-field">
             <label class="adj-label">Direction</label>
             <div class="adj-dir-toggle">
-              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">&#9650; Bullish (builds)</button>
-              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">&#9660; Bearish (draws)</button>
+              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish</button>
+              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish</button>
             </div>
           </div>
         </div>
@@ -2634,6 +2634,42 @@ function refreshChartWithAdjustments() {
   const app = window.__app;
   if (app && app.currentSeries && app.currentFc) {
     renderMainChart(app.currentSeries, app.currentFc);
+    // Update forecast cards with adjusted values
+    const adjFc = getAdjustedForecast(app.currentFc);
+    for (let h = 0; h < 4; h++) {
+      const adjEl = document.getElementById(`fc${h + 1}-adj`);
+      const v = app.currentFc.ensemble[h];
+      if (adjFc && adjFc[h] !== v) {
+        adjEl.textContent = `(${adjFc[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
+        adjEl.style.display = '';
+      } else {
+        adjEl.style.display = 'none';
+      }
+    }
+    // Rebuild detail table to reflect adjusted column
+    const fc = app.currentFc;
+    const series = app.currentSeries;
+    const last = series[series.length - 1].value;
+    const ld = new Date(series[series.length - 1].date);
+    const adjTh = document.getElementById('detail-adj-th');
+    adjTh.style.display = adjFc ? '' : 'none';
+    const dt = document.getElementById('detail-tbody');
+    let dr = '';
+    for (let h = 0; h < FC_WEEKS; h++) {
+      const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+      const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h - 1], ch = e - pv;
+      dr += `<tr><td>${d.toISOString().split('T')[0]}</td>
+        <td>${fmtVal(e)}</td>
+        <td class="${ch >= 0 ? 'positive' : 'negative'}">${fmtChg(ch)}</td>
+        <td>${fmtVal(e + fc.ciLow[h])}</td><td>${fmtVal(e + fc.ciHigh[h])}</td>
+        <td>${fmtVal(fc.sdReg[h])}</td><td>${fmtVal(fc.sdBalance[h])}</td><td>${fmtVal(fc.arModel[h])}</td>`;
+      if (adjFc) {
+        const adjV = adjFc[h], adjDiff = adjV - e;
+        dr += `<td style="color:${adjDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};font-weight:600">${fmtVal(adjV)}</td>`;
+      }
+      dr += '</tr>';
+    }
+    dt.innerHTML = dr;
   }
 }
 
