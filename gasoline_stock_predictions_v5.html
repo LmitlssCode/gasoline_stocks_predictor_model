@@ -152,6 +152,41 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 .log-wrap{max-height:250px;overflow-y:auto;background:var(--bg-input);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);line-height:1.6;margin-top:10px}
 .log-wrap .log-ok{color:var(--accent-green)}.log-wrap .log-warn{color:var(--accent-orange)}.log-wrap .log-err{color:var(--accent-red)}
 
+/* ─── Analyst Adjustments ─── */
+.adj-form{display:flex;flex-direction:column;gap:12px}
+.adj-form-row{display:flex;gap:14px;flex-wrap:wrap}
+.adj-field{display:flex;flex-direction:column;gap:5px;min-width:180px}
+.adj-label{font-family:var(--font-mono);font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.adj-field select,.adj-field input[type="number"],.adj-field input[type="text"]{font-family:var(--font-mono);font-size:.78rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;transition:border-color .2s}
+.adj-field select:hover,.adj-field input:hover{border-color:var(--accent-blue)}
+.adj-field select:focus,.adj-field input:focus{border-color:var(--accent-blue);outline:none}
+.adj-dir-toggle{display:flex;gap:4px}
+.adj-dir-btn{font-family:var(--font-mono);font-size:.72rem;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;transition:all .2s;flex:1}
+.adj-dir-btn.active[data-dir="1"]{background:rgba(63,185,80,.12);border-color:var(--accent-green);color:var(--accent-green);font-weight:600}
+.adj-dir-btn.active[data-dir="-1"]{background:rgba(248,81,73,.12);border-color:var(--accent-red);color:var(--accent-red);font-weight:600}
+.adj-dir-btn:hover{border-color:var(--accent-blue)}
+.adj-impact-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.adj-impact-row input{width:120px}
+.adj-presets{display:flex;gap:4px;flex-wrap:wrap}
+.adj-preset{font-family:var(--font-mono);font-size:.65rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.adj-preset:hover{border-color:var(--accent-orange);color:var(--accent-orange)}
+.adj-hint{font-size:.65rem;color:var(--text-muted);font-style:italic}
+.adj-weeks{display:flex;gap:10px;padding-top:2px}
+.adj-week-chk{font-family:var(--font-mono);font-size:.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:4px;cursor:pointer}
+.adj-week-chk input{accent-color:var(--accent-blue)}
+.adj-empty{font-family:var(--font-mono);font-size:.78rem;color:var(--text-muted);text-align:center;padding:24px 16px;border:1px dashed var(--border);border-radius:var(--radius);margin-top:4px}
+#adj-table{width:100%;margin-top:4px}
+#adj-table th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+#adj-table td{font-size:.78rem}
+.adj-total-row{background:var(--bg-input);font-weight:600}
+.adj-total-row td{border-top:2px solid var(--border-accent)}
+.adj-del-btn{font-size:.7rem;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--accent-red);cursor:pointer;transition:all .15s}
+.adj-del-btn:hover{background:rgba(248,81,73,.15);border-color:var(--accent-red)}
+#adj-compare{width:100%;margin-top:4px}
+#adj-compare th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+#adj-compare td{font-size:.78rem}
+.adj-positive{color:var(--accent-green)}.adj-negative{color:var(--accent-red)}
+
 /* ─── Help Modal ─── */
 #help-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #help-modal-overlay.open{display:flex}
@@ -257,6 +292,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
     <button class="page-tab active" data-tab="forecast">&#9654; Forecast</button>
     <button class="page-tab" data-tab="backtest">&#9881; Backtest — Predictions vs Actuals</button>
     <button class="page-tab" data-tab="metalearner">&#9881; Meta-Learner — How It Blends</button>
+    <button class="page-tab" data-tab="adjustments">&#9998; Analyst Adjustments</button>
   </div>
 
   <!-- ==================== FORECAST TAB ==================== -->
@@ -364,7 +400,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       <div class="card-actions"><button id="btn-export-detail" title="Copy table to clipboard">Copy</button></div>
     </div>
     <div class="data-table-wrap">
-      <table><thead><tr><th>Week Ending</th><th>Ensemble (kbbl)</th><th>Chg (kbbl)</th><th>Low 80% (kbbl)</th><th>High 80% (kbbl)</th><th>S&D Reg (kbbl)</th><th>S&D Bal (kbbl)</th><th>AR Model (kbbl)</th></tr></thead><tbody id="detail-tbody"></tbody></table>
+      <table><thead><tr><th>Week Ending</th><th>Ensemble (kbbl)</th><th>Chg (kbbl)</th><th>Low 80% (kbbl)</th><th>High 80% (kbbl)</th><th>S&D Reg (kbbl)</th><th>S&D Bal (kbbl)</th><th>AR Model (kbbl)</th><th id="detail-adj-th" style="display:none">Adjusted (kbbl)</th></tr></thead><tbody id="detail-tbody"></tbody></table>
     </div>
   </div>
 
@@ -554,6 +590,111 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 
   </div><!-- /tab-metalearner -->
 
+  <!-- ═══ Analyst Adjustments Tab ═══ -->
+  <div class="tab-panel" id="tab-adjustments">
+
+    <!-- Adjustment Builder -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>Add Adjustment</div></div>
+      <div class="adj-form">
+        <div class="adj-form-row">
+          <div class="adj-field">
+            <label class="adj-label">Event Type</label>
+            <select id="adj-type">
+              <option value="refinery_outage">Refinery Outage</option>
+              <option value="pipeline_disruption">Pipeline Disruption</option>
+              <option value="weather_event">Weather Event</option>
+              <option value="maintenance">Maintenance / Turnaround</option>
+              <option value="trade_shift">Import / Export Shift</option>
+              <option value="demand_shock">Demand Shock</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="adj-field">
+            <label class="adj-label">Direction</label>
+            <div class="adj-dir-toggle">
+              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">&#9650; Bullish (builds)</button>
+              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">&#9660; Bearish (draws)</button>
+            </div>
+          </div>
+        </div>
+        <div class="adj-form-row">
+          <div class="adj-field">
+            <label class="adj-label">Impact (kbbl)</label>
+            <div class="adj-impact-row">
+              <input type="number" id="adj-impact" placeholder="e.g. 3000" step="100" min="0">
+              <div class="adj-presets" id="adj-presets"></div>
+            </div>
+            <div class="adj-hint" id="adj-hint">Preset suggestions will appear based on event type and region</div>
+          </div>
+          <div class="adj-field">
+            <label class="adj-label">Weeks Affected</label>
+            <div class="adj-weeks">
+              <label class="adj-week-chk"><input type="checkbox" value="0" checked> +1W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="1" checked> +2W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="2"> +3W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="3"> +4W</label>
+            </div>
+          </div>
+        </div>
+        <div class="adj-form-row">
+          <div class="adj-field" style="flex:1">
+            <label class="adj-label">Notes (optional)</label>
+            <input type="text" id="adj-notes" placeholder="e.g. Gulf Coast refinery fire — expected 2-week impact" maxlength="200">
+          </div>
+          <div class="adj-field" style="flex:0 0 auto;align-self:flex-end">
+            <button class="primary" id="btn-adj-add">+ Add Adjustment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Adjustments -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>Active Adjustments</div>
+        <div class="card-actions"><button id="btn-adj-clear">Clear All</button></div>
+      </div>
+      <div id="adj-empty" class="adj-empty">No adjustments added. Use the form above to overlay analyst estimates on the model forecast.</div>
+      <div style="overflow-x:auto">
+        <table id="adj-table" style="display:none">
+          <thead><tr>
+            <th>Event</th>
+            <th>Direction</th>
+            <th>Impact (kbbl)</th>
+            <th>+1W</th><th>+2W</th><th>+3W</th><th>+4W</th>
+            <th>Notes</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="adj-tbody"></tbody>
+          <tfoot><tr class="adj-total-row">
+            <td colspan="2"><strong>Net Adjustment</strong></td>
+            <td id="adj-total-impact"></td>
+            <td id="adj-total-w1"></td><td id="adj-total-w2"></td><td id="adj-total-w3"></td><td id="adj-total-w4"></td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Adjusted Forecast Summary -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>Adjusted vs. Model Forecast</div></div>
+      <div id="adj-compare-empty" class="adj-empty">Add adjustments to see the comparison.</div>
+      <table id="adj-compare" style="display:none">
+        <thead><tr>
+          <th>Week</th>
+          <th>Model Ensemble (kbbl)</th>
+          <th>Adjustment (kbbl)</th>
+          <th>Adjusted Forecast (kbbl)</th>
+          <th>Change from Model</th>
+        </tr></thead>
+        <tbody id="adj-compare-tbody"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /tab-adjustments -->
+
   <!-- Engine Log (collapsible) -->
   <div class="card full-width">
     <div class="log-header" id="log-toggle">
@@ -617,6 +758,77 @@ const PRODUCTS = {
 
 // S&D data store — keyed like the dashboard: "category_product_area"
 const SD_DATA = {};
+
+// ═══════════════════════════════════════════════════════════
+// ANALYST ADJUSTMENTS ENGINE
+// ═══════════════════════════════════════════════════════════
+const ADJ_PRESETS_NUS = {
+  refinery_outage:      [1500, 4000, 10000],
+  pipeline_disruption:  [1000, 3000, 8000],
+  weather_event:        [2000, 5000, 12000],
+  maintenance:          [1000, 3000, 7000],
+  trade_shift:          [800, 2500, 6000],
+  demand_shock:         [1000, 3000, 7000],
+  other:                [500, 2000, 5000]
+};
+const ADJ_PRESET_LABELS = ['Minor', 'Moderate', 'Major'];
+const ADJ_TYPE_LABELS = {
+  refinery_outage: 'Refinery Outage', pipeline_disruption: 'Pipeline Disruption',
+  weather_event: 'Weather Event', maintenance: 'Maintenance / Turnaround',
+  trade_shift: 'Import / Export Shift', demand_shock: 'Demand Shock', other: 'Other'
+};
+let analystAdjustments = [];
+let adjIdCounter = 0;
+
+function getAdjPresets(eventType) {
+  // Scale presets by PADD's share of national stocks if a PADD is selected
+  const base = ADJ_PRESETS_NUS[eventType] || ADJ_PRESETS_NUS.other;
+  const padd = document.getElementById('sel-padd').value;
+  if (padd === 'NUS') return base;
+
+  const app = window.__app;
+  if (!app || !app.rawData || !app.currentSeries) return base.map(v => Math.round(v * 0.2));
+  const pk = document.getElementById('sel-product').value;
+  const nusRaw = app.rawData[pk];
+  if (!nusRaw) return base.map(v => Math.round(v * 0.2));
+  const nusSeries = extractSeries(nusRaw, 'NUS');
+  if (!nusSeries || nusSeries.length < 10) return base.map(v => Math.round(v * 0.2));
+
+  const paddLast = app.currentSeries[app.currentSeries.length - 1].value;
+  const nusLast = nusSeries[nusSeries.length - 1].value;
+  const share = nusLast > 0 ? paddLast / nusLast : 0.2;
+  return base.map(v => Math.round(v * share / 100) * 100);
+}
+
+function getNetAdjustments() {
+  const net = [0, 0, 0, 0];
+  for (const adj of analystAdjustments) {
+    for (let h = 0; h < 4; h++) {
+      if (adj.weeks[h]) net[h] += adj.direction * adj.impact;
+    }
+  }
+  return net;
+}
+
+function getAdjustedForecast(fc) {
+  if (!fc || analystAdjustments.length === 0) return null;
+  const net = getNetAdjustments();
+  return fc.ensemble.map((v, h) => v + net[h]);
+}
+
+function saveAdjustments() {
+  try { localStorage.setItem('gasoline_adj_v5', JSON.stringify(analystAdjustments)); } catch(e) {}
+}
+
+function loadAdjustments() {
+  try {
+    const raw = localStorage.getItem('gasoline_adj_v5');
+    if (raw) {
+      analystAdjustments = JSON.parse(raw);
+      adjIdCounter = analystAdjustments.reduce((mx, a) => Math.max(mx, a.id || 0), 0) + 1;
+    }
+  } catch(e) { analystAdjustments = []; }
+}
 
 // ═══════════════════════════════════════════════════════════
 // UI HELPERS
@@ -1758,7 +1970,7 @@ let mainChart, seasonalChart, backtestChart, btScatterChart;
 const CC = {
   history: '#58a6ff', forecast: '#39d2c0',
   ciBand: 'rgba(57,210,192,0.1)', ciBorder: 'rgba(57,210,192,0.25)',
-  seasonal: '#bc8cff', hw: '#f778ba', sdreg: '#d29922', ar: '#6e7681', sdbal: '#f47067',
+  seasonal: '#bc8cff', hw: '#f778ba', sdreg: '#d29922', ar: '#6e7681', sdbal: '#f47067', adjusted: '#f0883e',
   avg5yr: 'rgba(88,166,255,0.08)', avg5yrBorder: 'rgba(88,166,255,0.2)',
   avg5yrLine: 'rgba(88,166,255,0.35)'
 };
@@ -1891,6 +2103,25 @@ function renderMainChart(series, fc) {
     {label: 'S&D Balance', data: [br, ...fc.sdBalance.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.sdbal, borderWidth: 1.5, pointRadius: 0, borderDash: [5, 5], tension: 0, order: 3},
     {label: 'AR Model', data: [br, ...fc.arModel.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.ar, borderWidth: 1.5, pointRadius: 0, borderDash: [5, 5], tension: 0, order: 3}
   );
+
+  // Adjusted Ensemble line (only when analyst adjustments are active)
+  const adjFc = getAdjustedForecast(fc);
+  if (adjFc) {
+    datasets.push({
+      label: 'Adjusted Ensemble',
+      data: [br, ...adjFc.map((v, i) => ({x: fds[i], y: v}))],
+      borderColor: CC.adjusted,
+      borderWidth: 2.5,
+      pointRadius: [0, 4, 4, 4, 4],
+      pointHoverRadius: 5,
+      pointBackgroundColor: '#f0883e',
+      pointBorderColor: '#0d1117',
+      pointBorderWidth: 1.5,
+      borderDash: [8, 4],
+      tension: 0,
+      order: 0
+    });
+  }
 
   const hiddenLabels = new Set(['CI Lower', '5-Yr High', '5-Yr Low']);
 
@@ -2286,17 +2517,142 @@ function updateMetaLearnerTab(fc) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ANALYST ADJUSTMENTS UI
+// ═══════════════════════════════════════════════════════════
+function updateAdjPresetButtons() {
+  const type = document.getElementById('adj-type').value;
+  const presets = getAdjPresets(type);
+  const container = document.getElementById('adj-presets');
+  container.innerHTML = presets.map((v, i) =>
+    `<button class="adj-preset" data-val="${v}">${ADJ_PRESET_LABELS[i]}: ${v.toLocaleString()}</button>`
+  ).join('');
+  container.querySelectorAll('.adj-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('adj-impact').value = btn.dataset.val;
+    });
+  });
+  const padd = document.getElementById('sel-padd').value;
+  document.getElementById('adj-hint').textContent = padd === 'NUS'
+    ? 'Presets calibrated for US Total. Enter any custom kbbl value.'
+    : `Presets auto-scaled for ${PL[padd]}. Enter any custom kbbl value.`;
+}
+
+function renderAdjustmentsTable() {
+  const tbody = document.getElementById('adj-tbody');
+  const table = document.getElementById('adj-table');
+  const empty = document.getElementById('adj-empty');
+
+  if (analystAdjustments.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  let html = '';
+  for (const adj of analystAdjustments) {
+    const dirClass = adj.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const dirLabel = adj.direction > 0 ? '&#9650; Bullish' : '&#9660; Bearish';
+    const signed = adj.direction > 0 ? '+' : '-';
+    html += `<tr>
+      <td>${ADJ_TYPE_LABELS[adj.type] || adj.type}</td>
+      <td class="${dirClass}">${dirLabel}</td>
+      <td class="${dirClass}">${signed}${adj.impact.toLocaleString()}</td>
+      <td>${adj.weeks[0] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[1] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[2] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[3] ? '&#10003;' : ''}</td>
+      <td style="font-size:.72rem;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(adj.notes || '').replace(/"/g, '&quot;')}">${adj.notes || '—'}</td>
+      <td><button class="adj-del-btn" data-id="${adj.id}">&times;</button></td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+
+  // Totals
+  const net = getNetAdjustments();
+  document.getElementById('adj-total-impact').textContent = '—';
+  for (let h = 0; h < 4; h++) {
+    const el = document.getElementById(`adj-total-w${h + 1}`);
+    const cls = net[h] > 0 ? 'adj-positive' : net[h] < 0 ? 'adj-negative' : '';
+    el.className = cls;
+    el.textContent = net[h] !== 0 ? (net[h] > 0 ? '+' : '') + net[h].toLocaleString() : '0';
+  }
+
+  // Wire delete buttons
+  tbody.querySelectorAll('.adj-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      analystAdjustments = analystAdjustments.filter(a => a.id !== parseInt(btn.dataset.id));
+      saveAdjustments();
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+    });
+  });
+}
+
+function updateAdjCompare() {
+  const app = window.__app;
+  const table = document.getElementById('adj-compare');
+  const empty = document.getElementById('adj-compare-empty');
+  const tbody = document.getElementById('adj-compare-tbody');
+
+  if (analystAdjustments.length === 0 || !app || !app.currentFc) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  const fc = app.currentFc;
+  const net = getNetAdjustments();
+  let html = '';
+  for (let h = 0; h < FC_WEEKS; h++) {
+    const model = fc.ensemble[h];
+    const adj = net[h];
+    const adjusted = model + adj;
+    const pct = model !== 0 ? ((adj / model) * 100).toFixed(2) : '0.00';
+    const cls = adj > 0 ? 'adj-positive' : adj < 0 ? 'adj-negative' : '';
+    html += `<tr>
+      <td>+${h + 1}W</td>
+      <td>${fmtVal(model)}</td>
+      <td class="${cls}">${adj !== 0 ? (adj > 0 ? '+' : '') + adj.toLocaleString() : '0'}</td>
+      <td><strong>${fmtVal(adjusted)}</strong></td>
+      <td class="${cls}">${adj !== 0 ? (pct > 0 ? '+' : '') + pct + '%' : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+function refreshChartWithAdjustments() {
+  const app = window.__app;
+  if (app && app.currentSeries && app.currentFc) {
+    renderMainChart(app.currentSeries, app.currentFc);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // CSV EXPORT
 // ═══════════════════════════════════════════════════════════
 function exportCSV(series, fc) {
   const ld = new Date(series[series.length - 1].date);
   const last = series[series.length - 1].value;
-  let csv = 'Week Ending,Ensemble (kbbl),Change (kbbl),CI Low 80% (kbbl),CI High 80% (kbbl),S&D Reg (kbbl),S&D Balance (kbbl),AR Model (kbbl)\n';
+  const adjFc = getAdjustedForecast(fc);
+  const hasAdj = adjFc != null;
+  let csv = 'Week Ending,Ensemble (kbbl),Change (kbbl),CI Low 80% (kbbl),CI High 80% (kbbl),S&D Reg (kbbl),S&D Balance (kbbl),AR Model (kbbl)';
+  if (hasAdj) csv += ',Adjusted (kbbl),Adjustment (kbbl)';
+  csv += '\n';
   for (let h = 0; h < FC_WEEKS; h++) {
     const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
     const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h - 1], ch = e - pv;
     const sr = fc.sdReg[h], sb = fc.sdBalance[h], ar = fc.arModel[h];
-    csv += `${d.toISOString().split('T')[0]},${e.toFixed(1)},${ch.toFixed(1)},${(e + fc.ciLow[h]).toFixed(1)},${(e + fc.ciHigh[h]).toFixed(1)},${sr != null ? sr.toFixed(1) : ''},${sb != null ? sb.toFixed(1) : ''},${ar != null ? ar.toFixed(1) : ''}\n`;
+    csv += `${d.toISOString().split('T')[0]},${e.toFixed(1)},${ch.toFixed(1)},${(e + fc.ciLow[h]).toFixed(1)},${(e + fc.ciHigh[h]).toFixed(1)},${sr != null ? sr.toFixed(1) : ''},${sb != null ? sb.toFixed(1) : ''},${ar != null ? ar.toFixed(1) : ''}`;
+    if (hasAdj) {
+      const net = getNetAdjustments();
+      csv += `,${adjFc[h].toFixed(1)},${net[h].toFixed(1)}`;
+    }
+    csv += '\n';
   }
   const blob = new Blob([csv], {type: 'text/csv'});
   const url = URL.createObjectURL(blob);
@@ -2305,7 +2661,7 @@ function exportCSV(series, fc) {
   a.download = `gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-  log('CSV exported', 'ok');
+  log('CSV exported' + (hasAdj ? ' (includes analyst adjustments)' : ''), 'ok');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2618,6 +2974,62 @@ const APP = window.__app = {
         navigator.clipboard.writeText(text).then(() => log('Backtest table copied', 'ok'));
       }
     });
+
+    // ─── Analyst Adjustments handlers ───
+    loadAdjustments();
+    updateAdjPresetButtons();
+    renderAdjustmentsTable();
+
+    document.getElementById('adj-type').addEventListener('change', updateAdjPresetButtons);
+    document.getElementById('sel-padd').addEventListener('change', updateAdjPresetButtons);
+
+    // Direction toggle
+    document.querySelectorAll('.adj-dir-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.adj-dir-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Add adjustment
+    document.getElementById('btn-adj-add').addEventListener('click', () => {
+      const impact = parseFloat(document.getElementById('adj-impact').value);
+      if (!impact || impact <= 0) { log('Enter a positive impact value (kbbl)', 'warn'); return; }
+      const dir = document.querySelector('.adj-dir-btn.active')?.dataset.dir;
+      const weeks = [false, false, false, false];
+      document.querySelectorAll('.adj-week-chk input').forEach(cb => {
+        weeks[parseInt(cb.value)] = cb.checked;
+      });
+      if (!weeks.some(w => w)) { log('Select at least one week', 'warn'); return; }
+
+      analystAdjustments.push({
+        id: adjIdCounter++,
+        type: document.getElementById('adj-type').value,
+        direction: parseInt(dir) || 1,
+        impact: impact,
+        weeks: weeks,
+        notes: document.getElementById('adj-notes').value.trim()
+      });
+      saveAdjustments();
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+      document.getElementById('adj-impact').value = '';
+      document.getElementById('adj-notes').value = '';
+      log(`Adjustment added: ${ADJ_TYPE_LABELS[document.getElementById('adj-type').value]} ${impact.toLocaleString()} kbbl`, 'ok');
+    });
+
+    // Clear all adjustments
+    document.getElementById('btn-adj-clear').addEventListener('click', () => {
+      if (analystAdjustments.length === 0) return;
+      analystAdjustments = [];
+      adjIdCounter = 0;
+      saveAdjustments();
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+      log('All adjustments cleared', 'ok');
+    });
   },
 
   runBacktestUI() {
@@ -2771,6 +3183,9 @@ const APP = window.__app = {
 
     // Detail table
     const dt = document.getElementById('detail-tbody');
+    const adjFcDetail = getAdjustedForecast(fc);
+    const adjTh = document.getElementById('detail-adj-th');
+    adjTh.style.display = adjFcDetail ? '' : 'none';
     let dr = '';
     for (let h = 0; h < FC_WEEKS; h++) {
       const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
@@ -2779,7 +3194,12 @@ const APP = window.__app = {
         <td>${fmtVal(e)}</td>
         <td class="${ch >= 0 ? 'positive' : 'negative'}">${fmtChg(ch)}</td>
         <td>${fmtVal(e + fc.ciLow[h])}</td><td>${fmtVal(e + fc.ciHigh[h])}</td>
-        <td>${fmtVal(fc.sdReg[h])}</td><td>${fmtVal(fc.sdBalance[h])}</td><td>${fmtVal(fc.arModel[h])}</td></tr>`;
+        <td>${fmtVal(fc.sdReg[h])}</td><td>${fmtVal(fc.sdBalance[h])}</td><td>${fmtVal(fc.arModel[h])}</td>`;
+      if (adjFcDetail) {
+        const adjV = adjFcDetail[h], adjDiff = adjV - e;
+        dr += `<td style="color:${adjDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};font-weight:600">${fmtVal(adjV)}</td>`;
+      }
+      dr += '</tr>';
     }
     dt.innerHTML = dr;
 
@@ -2813,6 +3233,8 @@ const APP = window.__app = {
     renderMainChart(series, fc);
     renderSeasonalChart(series);
     updateMetaLearnerTab(fc);
+    updateAdjCompare();
+    updateAdjPresetButtons();
 
     log('Forecast complete', 'ok');
     setStatus('ready', 'READY');
