@@ -18,7 +18,7 @@
   --border-accent: #30363d;
   --text-primary: #e6edf3;
   --text-secondary: #8b949e;
-  --text-muted: #484f58;
+  --text-muted: #6e7681;
   --accent-blue: #58a6ff;
   --accent-green: #3fb950;
   --accent-red: #f85149;
@@ -92,6 +92,7 @@ main{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:20px 24p
 .fc-badge.down{background:rgba(248,81,73,.12);color:var(--accent-red);border:1px solid rgba(248,81,73,.2)}
 .fc-value{font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:var(--text-primary);line-height:1}
 .fc-sub{font-family:var(--font-mono);font-size:.72rem;color:var(--text-muted);margin-top:4px}
+.fc-adj{font-family:var(--font-mono);font-size:.72rem;color:#f0883e;margin-top:2px;display:none}
 .fc-range{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .fc-yoy{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);margin-top:4px}
 
@@ -304,6 +305,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       <div class="fc-top"><div class="fc-label">+1 Week</div><div class="fc-badge" id="fc1-badge"></div></div>
       <div class="fc-value" id="fc1-val">—</div>
       <div class="fc-sub" id="fc1-sub"></div>
+      <div class="fc-adj" id="fc1-adj"></div>
       <div class="fc-range" id="fc1-rng"></div>
       <div class="fc-yoy" id="fc1-yoy"></div>
     </div>
@@ -311,6 +313,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       <div class="fc-top"><div class="fc-label">+2 Weeks</div><div class="fc-badge" id="fc2-badge"></div></div>
       <div class="fc-value" id="fc2-val">—</div>
       <div class="fc-sub" id="fc2-sub"></div>
+      <div class="fc-adj" id="fc2-adj"></div>
       <div class="fc-range" id="fc2-rng"></div>
       <div class="fc-yoy" id="fc2-yoy"></div>
     </div>
@@ -318,6 +321,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       <div class="fc-top"><div class="fc-label">+3 Weeks</div><div class="fc-badge" id="fc3-badge"></div></div>
       <div class="fc-value" id="fc3-val">—</div>
       <div class="fc-sub" id="fc3-sub"></div>
+      <div class="fc-adj" id="fc3-adj"></div>
       <div class="fc-range" id="fc3-rng"></div>
       <div class="fc-yoy" id="fc3-yoy"></div>
     </div>
@@ -325,6 +329,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       <div class="fc-top"><div class="fc-label">+4 Weeks</div><div class="fc-badge" id="fc4-badge"></div></div>
       <div class="fc-value" id="fc4-val">—</div>
       <div class="fc-sub" id="fc4-sub"></div>
+      <div class="fc-adj" id="fc4-adj"></div>
       <div class="fc-range" id="fc4-rng"></div>
       <div class="fc-yoy" id="fc4-yoy"></div>
     </div>
@@ -2553,7 +2558,7 @@ function renderAdjustmentsTable() {
   let html = '';
   for (const adj of analystAdjustments) {
     const dirClass = adj.direction > 0 ? 'adj-positive' : 'adj-negative';
-    const dirLabel = adj.direction > 0 ? '&#9650; Bullish' : '&#9660; Bearish';
+    const dirLabel = adj.direction > 0 ? 'Bullish' : 'Bearish';
     const signed = adj.direction > 0 ? '+' : '-';
     html += `<tr>
       <td>${ADJ_TYPE_LABELS[adj.type] || adj.type}</td>
@@ -3136,6 +3141,7 @@ const APP = window.__app = {
     }
 
     // Forecast cards
+    const adjFcCards = getAdjustedForecast(fc);
     for (let h = 0; h < 4; h++) {
       const v = fc.ensemble[h], ch = v - last, pct = last !== 0 ? (ch / last) * 100 : 0;
       document.getElementById(`fc${h + 1}-val`).textContent = fmtVal(v);
@@ -3144,6 +3150,15 @@ const APP = window.__app = {
       const badge = document.getElementById(`fc${h + 1}-badge`);
       badge.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
       badge.className = 'fc-badge ' + (ch >= 0 ? 'up' : 'down');
+
+      // Adjusted ensemble value
+      const adjEl = document.getElementById(`fc${h + 1}-adj`);
+      if (adjFcCards && adjFcCards[h] !== v) {
+        adjEl.textContent = `(${adjFcCards[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
+        adjEl.style.display = '';
+      } else {
+        adjEl.style.display = 'none';
+      }
 
       document.getElementById(`fc${h + 1}-rng`).textContent = `80% CI: ${fmtVal(v + fc.ciLow[h])} — ${fmtVal(v + fc.ciHigh[h])}`;
 
