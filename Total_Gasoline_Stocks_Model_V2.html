@@ -1282,9 +1282,7 @@ function estimatePaddDemand(padd, stockDates, paddSeries) {
   const avgShare = recentShares.reduce((a, b) => a + b, 0) / recentShares.length;
 
   // Scale national demand by PADD share
-  const paddDemand = nationalDemand.map(v => v != null ? v * avgShare : null);
-  log(`  PADD demand est: ${(avgShare * 100).toFixed(1)}% of national`, 'ok');
-  return paddDemand;
+  return nationalDemand.map(v => v != null ? v * avgShare : null);
 }
 
 // Build S&D features object for a given PADD
@@ -1844,16 +1842,14 @@ function trainMetaLearner(series, sdF) {
 }
 
 // ─── Ensemble Engine (v5 — regime-aware meta-learner) ───
-function runEnsemble(series, sdF, horizon) {
+function runEnsemble(series, sdF, horizon, quiet) {
   const regime = detectRegime(series, sdF);
   const hasSdData = countSDFeatures(sdF) >= 3;
 
-  // Primary models (always run)
   const m1 = sdRegression(series, sdF, horizon);
   const m2 = sdBalanceModel(series, sdF, horizon);
   const m3 = arModel(series, horizon);
 
-  // Fallback models (only when S&D data unavailable or primary models fail)
   const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
   const needFallback = !hasSdData || primaryCount < 2;
   const m4 = needFallback ? seasonalNaive(series, horizon) : null;
@@ -1863,7 +1859,6 @@ function runEnsemble(series, sdF, horizon) {
   const names = ['S&D Reg', 'S&D Balance', 'AR Model', 'Seasonal*', 'Holt-Win*'];
   const activeCount = models.filter(m => m !== null).length;
 
-  // Try meta-learner first
   const cacheKey = weightCacheKey(series);
   let metaModel = WEIGHT_CACHE.get(cacheKey + '_meta');
   if (!metaModel) {
@@ -1871,16 +1866,17 @@ function runEnsemble(series, sdF, horizon) {
     if (metaModel) WEIGHT_CACHE.set(cacheKey + '_meta', metaModel);
   }
 
-  // Get inverse-MAE weights as fallback/blend
   let w = WEIGHT_CACHE.get(cacheKey + '_weights');
   if (!w) {
     w = calcWeights(series, sdF, needFallback);
     WEIGHT_CACHE.set(cacheKey + '_weights', w);
   }
 
-  const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
-  log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
-  log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+  if (!quiet) {
+    const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
+    log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
+    log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+  }
 
   const fc = [];
   for (let h = 0; h < horizon; h++) {
@@ -2078,6 +2074,65 @@ function runEnsembleRaw(series, sdF, horizon) {
     fc.push(cnt > 0 ? sum / cnt : series[series.length - 1].value);
   }
   return fc;
+}
+
+// Lite ensemble — runs 3 models + applies cached weights/meta-learner.
+// Skips CI, metrics, weight training, and meta-learner training.
+// Used by backtest and cross-PADD snapshot for performance.
+function runEnsembleLite(series, sdF, horizon) {
+  const regime = detectRegime(series, sdF);
+  const hasSdData = countSDFeatures(sdF) >= 3;
+
+  const m1 = sdRegression(series, sdF, horizon);
+  const m2 = sdBalanceModel(series, sdF, horizon);
+  const m3 = arModel(series, horizon);
+
+  const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+  const needFallback = !hasSdData || primaryCount < 2;
+  const m4 = needFallback ? seasonalNaive(series, horizon) : null;
+  const m5 = needFallback ? holtWinters(series, horizon) : null;
+  const models = [m1, m2, m3, m4, m5];
+
+  // Use cached meta-learner + weights if available, otherwise use defaults
+  const cacheKey = weightCacheKey(series);
+  const metaModel = WEIGHT_CACHE.get(cacheKey + '_meta') || null;
+  const w = WEIGHT_CACHE.get(cacheKey + '_weights') ||
+            (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+  const fc = [];
+  for (let h = 0; h < horizon; h++) {
+    let val = null;
+    if (metaModel && m1 && m2 && m3) {
+      const rf = regimeFeatures(regime);
+      const metaFeatures = [m1[h], m2[h], m3[h], ...rf];
+      val = metaModel.coeffs[0];
+      for (let j = 0; j < metaFeatures.length; j++) val += metaModel.coeffs[j + 1] * metaFeatures[j];
+      const modelOutputs = [m1[h], m2[h], m3[h]];
+      const mn = Math.min(...modelOutputs), mx = Math.max(...modelOutputs);
+      const range = mx - mn;
+      if (val < mn - range * 0.5 || val > mx + range * 0.5) val = null;
+    }
+    if (val == null) {
+      let ws = 0, vs = 0;
+      for (let i = 0; i < NUM_MODELS; i++) {
+        if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+      }
+      val = ws > 0 ? vs / ws : series[series.length - 1].value;
+    }
+    fc.push(val);
+  }
+
+  return {
+    ensemble: fc,
+    sdReg: m1 || fc,
+    sdBalance: m2 || fc,
+    arModel: m3 || fc,
+    sdRegRaw: m1,
+    sdBalanceRaw: m2,
+    arModelRaw: m3,
+    regime,
+    weights: w
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2946,8 +3001,9 @@ const APP = window.__app = {
   rawData: {},
   currentSeries: null,
   currentFc: null,
-  dataLoadedAt: 0, // timestamp of last data fetch
-  DATA_TTL: 30 * 60 * 1000, // refresh if data older than 30 minutes
+  forecastCache: {},  // per-PADD forecast cache keyed by padd + lastDate
+  dataLoadedAt: 0,
+  DATA_TTL: 30 * 60 * 1000,
 
   async init() {
     log('Total Gasoline Stocks Model v6.2', 'ok');
@@ -3015,7 +3071,7 @@ const APP = window.__app = {
     setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); setStatus('ready', 'READY'); }, 500);
 
     // Event listeners
-    document.getElementById('btn-run').addEventListener('click', () => this.runForecast());
+    document.getElementById('btn-run').addEventListener('click', () => this.runForecast(true));
     // No product selector — Total Motor Gasoline only
     document.getElementById('sel-padd').addEventListener('change', () => this.runForecast());
 
@@ -3024,9 +3080,11 @@ const APP = window.__app = {
       setStatus('loading', 'REFRESHING...');
       for (const key in cache) delete cache[key];
       for (const key in SD_DATA) delete SD_DATA[key];
+      WEIGHT_CACHE.clear();
       this.rawData = {};
       this.currentSeries = null;
       this.currentFc = null;
+      this.forecastCache = {};
       {
         log(`Reloading ${PRODUCT_CFG.label}...`);
         const url = stocUrl(PRODUCT_CFG.productCode);
@@ -3378,6 +3436,7 @@ const APP = window.__app = {
     this.rawData = {};
     this.currentSeries = null;
     this.currentFc = null;
+    this.forecastCache = {};
     {
       log(`Reloading ${PRODUCT_CFG.label}...`);
       const url = stocUrl(PRODUCT_CFG.productCode);
@@ -3398,25 +3457,35 @@ const APP = window.__app = {
     log('Auto-refresh complete', 'ok');
   },
 
-  async runForecast() {
+  async runForecast(forceRefresh) {
     await this.refreshIfStale();
     const pk = PRODUCT_KEY;
     const padd = document.getElementById('sel-padd').value;
-    setStatus('loading', 'FORECASTING...');
-    log(`--- ${PRODUCT_CFG.label} / ${PL[padd]} ---`);
 
     const api = this.rawData[pk];
     if (!api) { log('No data for this product', 'err'); setStatus('error', 'NO DATA'); return; }
 
     const series = extractSeries(api, padd);
     if (series.length < 20) { log(`Only ${series.length} weeks, need 20+`, 'err'); setStatus('error', 'INSUFFICIENT'); return; }
+
+    const latestDate = series[series.length - 1].date;
+    const cacheHit = !forceRefresh && this.forecastCache[padd] && this.forecastCache[padd].asOf === latestDate;
+
+    if (cacheHit) {
+      log(`--- ${PL[padd]} (cached) ---`);
+      const cached = this.forecastCache[padd];
+      this.currentSeries = cached.series;
+      this.currentFc = cached.fc;
+      this._renderForecastUI(cached.series, cached.fc, api);
+      return;
+    }
+
+    setStatus('loading', 'FORECASTING...');
+    log(`--- ${PRODUCT_CFG.label} / ${PL[padd]} ---`);
     log(`${series.length} weeks (${series[0].date} to ${series[series.length - 1].date})`);
 
-    // Update data badge
-    const latestDate = series[series.length - 1].date;
     document.getElementById('data-badge').innerHTML = `Latest: <strong>${latestDate}</strong>`;
 
-    // v4: Build real S&D features aligned to this series
     const stockDates = series.map(d => d.date);
     const sdF = buildSDFeatures(padd, stockDates, series);
     const sdCount = countSDFeatures(sdF);
@@ -3425,14 +3494,24 @@ const APP = window.__app = {
     const fc = runEnsemble(series, sdF, FC_WEEKS);
     const last = series[series.length - 1].value;
 
+    // Cache this forecast
+    this.forecastCache[padd] = { series, fc, asOf: latestDate };
+
+    this._renderForecastUI(series, fc, api);
+  },
+
+  _renderForecastUI(series, fc, api) {
+    const last = series[series.length - 1].value;
+    const ld = new Date(series[series.length - 1].date);
+
+    document.getElementById('data-badge').innerHTML = `Latest: <strong>${series[series.length - 1].date}</strong>`;
+
     // Year-over-year for forecast dates
     const yoyData = [];
-    const ld = new Date(series[series.length - 1].date);
     for (let h = 0; h < 4; h++) {
       const fd = new Date(ld); fd.setDate(fd.getDate() + 7 * (h + 1));
       const wk = weekOfYear(fd.toISOString().split('T')[0]);
       const yr = fd.getFullYear();
-      // Find last year same week
       let lyVal = null;
       for (const d of series) {
         const dyr = parseInt(d.date.substring(0, 4));
@@ -3454,7 +3533,6 @@ const APP = window.__app = {
       badge.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
       badge.className = 'fc-badge ' + (ch >= 0 ? 'up' : 'down');
 
-      // Adjusted ensemble value
       const adjEl = document.getElementById(`fc${h + 1}-adj`);
       if (adjFcCards && adjFcCards[h] !== v) {
         adjEl.textContent = `(${adjFcCards[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
@@ -3465,7 +3543,6 @@ const APP = window.__app = {
 
       document.getElementById(`fc${h + 1}-rng`).textContent = `80% CI: ${fmtVal(v + fc.ciLow[h])} — ${fmtVal(v + fc.ciHigh[h])}`;
 
-      // YoY comparison
       const yoyEl = document.getElementById(`fc${h + 1}-yoy`);
       if (yoyData[h] != null && yoyData[h] !== 0) {
         const yoyChg = ((v - yoyData[h]) / yoyData[h] * 100).toFixed(1);
@@ -3489,7 +3566,6 @@ const APP = window.__app = {
     document.getElementById('m-sdcount').textContent = fc.sdFeatureCount + ' / 8';
     document.getElementById('m-active').textContent = fc.activeCount + (fc.needFallback ? ' (+fallbacks)' : '');
 
-    // Quality indicators
     const mapeVal = parseFloat(fc.metrics.mape);
     if (!isNaN(mapeVal)) {
       document.getElementById('mi-mape').dataset.quality = mapeVal < 2 ? 'good' : mapeVal < 5 ? 'ok' : 'poor';
@@ -3521,36 +3597,6 @@ const APP = window.__app = {
     }
     dt.innerHTML = dr;
 
-    // PADD table — use real S&D features for each region (matching Forecast tab logic)
-    const pt = document.getElementById('padd-tbody');
-    let pr = '';
-    for (const p of PADDS) {
-      const s = extractSeries(api, p);
-      if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
-      const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
-      let f1 = lt, f4 = lt;
-      try {
-        const paddDates = s.map(d => d.date);
-        const paddSdF = buildSDFeatures(p, paddDates, s);
-        const f = runEnsemble(s, paddSdF, 4);
-        f1 = f.ensemble[0]; f4 = f.ensemble[3];
-      } catch(e) {}
-      const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
-      let a5 = 0, c5 = 0;
-      for (const d of s) {
-        const dy = parseInt(d.date.substring(0, 4));
-        if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; }
-      }
-      a5 = c5 > 0 ? a5 / c5 : lt;
-      const v5 = lt - a5;
-      pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
-        <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
-        <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
-        <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
-    }
-    pt.innerHTML = pr;
-
-    // Charts
     this.currentSeries = series;
     this.currentFc = fc;
     renderMainChart(series, fc);
@@ -3559,12 +3605,43 @@ const APP = window.__app = {
     updateAdjCompare();
     updateAdjPresetButtons();
 
-    // Score journal entries against new actuals
     journalScoreEntries(series);
     renderJournalUI();
 
-    log('Forecast complete', 'ok');
     setStatus('ready', 'READY');
+
+    // Deferred: cross-PADD snapshot (non-blocking)
+    if (api) {
+      setTimeout(() => {
+        const pt = document.getElementById('padd-tbody');
+        let pr = '';
+        for (const p of PADDS) {
+          const s = extractSeries(api, p);
+          if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
+          const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
+          let f1 = lt, f4 = lt;
+          try {
+            const paddDates = s.map(d => d.date);
+            const paddSdF = buildSDFeatures(p, paddDates, s);
+            const f = runEnsembleLite(s, paddSdF, 4);
+            f1 = f.ensemble[0]; f4 = f.ensemble[3];
+          } catch(e) {}
+          const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
+          let a5 = 0, c5 = 0;
+          for (const d of s) {
+            const dy = parseInt(d.date.substring(0, 4));
+            if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; }
+          }
+          a5 = c5 > 0 ? a5 / c5 : lt;
+          const v5 = lt - a5;
+          pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
+            <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
+            <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
+            <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
+        }
+        pt.innerHTML = pr;
+      }, 50);
+    }
   }
 };
 
@@ -3586,7 +3663,7 @@ function runBacktest(series, horizon, windowSize, sdF) {
     }
 
     try {
-      const fc = runEnsemble(sub, sdSub, horizon);
+      const fc = runEnsembleLite(sub, sdSub, horizon);
       const ensPred = fc.ensemble[horizon - 1];
 
       const actual = series[t + horizon].value;
