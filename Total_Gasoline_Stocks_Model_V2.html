@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gasoline Stock Prediction Engine v5</title>
+<title>Total Gasoline Stocks Model V2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -187,6 +187,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 #adj-compare th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
 #adj-compare td{font-size:.78rem}
 .adj-positive{color:var(--accent-green)}.adj-negative{color:var(--accent-red)}
+
 /* ─── Help Modal ─── */
 #help-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #help-modal-overlay.open{display:flex}
@@ -254,18 +255,13 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 <body>
 <div class="grain"></div>
 <div id="loading-overlay">
-  <div class="loader-title">GASOLINE STOCK PREDICTION ENGINE</div>
+  <div class="loader-title">TOTAL GASOLINE STOCKS MODEL V2</div>
   <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-fill"></div></div>
   <div class="loader-status" id="loader-status">Initializing...</div>
 </div>
 <header>
-  <div class="logo">GASOLINE PREDICT <span>v5.0</span></div>
+  <div class="logo">TOTAL GAS MODEL <span>v6.2</span></div>
   <div class="controls">
-    <select id="sel-product">
-      <option value="totalMotorGas">Total Motor Gasoline</option>
-      <option value="rbob">RBOB (Reformulated Blendstock)</option>
-      <option value="cbob">CBOB (Conventional Blendstock)</option>
-    </select>
     <select id="sel-padd">
       <option value="NUS">U.S. Total</option>
       <option value="R10">PADD 1 — East Coast</option>
@@ -617,8 +613,8 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
           <div class="adj-field">
             <label class="adj-label">Direction</label>
             <div class="adj-dir-toggle">
-              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish</button>
-              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish</button>
+              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish (Builds)</button>
+              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish (Draws)</button>
             </div>
           </div>
         </div>
@@ -697,6 +693,47 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       </table>
     </div>
 
+    <!-- Adjustment Journal — Scorecard -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>Adjustment Journal — Performance Tracker</div>
+        <div class="card-actions"><button id="btn-journal-clear">Clear Journal</button></div>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-secondary);margin:0 0 12px;line-height:1.5">
+        Every adjustment is logged with a snapshot of the model forecast. When actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone.
+      </p>
+      <div id="journal-empty" class="adj-empty">No scored journal entries yet. Add adjustments and wait for actual data to arrive for scoring.</div>
+      <div id="journal-scorecard" style="display:none">
+        <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-entries">—</div><div class="metric-label">Scored Entries</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-pct">—</div><div class="metric-label">Adj. Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-model-pct">—</div><div class="metric-label">Model Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-improvement">—</div><div class="metric-label">MAE Improvement</div></div>
+        </div>
+        <div class="metrics-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-model-mae">—</div><div class="metric-label">Avg Model MAE (kbbl)</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-mae">—</div><div class="metric-label">Avg Adjusted MAE (kbbl)</div></div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="journal-table" style="display:none">
+          <thead><tr>
+            <th>Date Logged</th>
+            <th>Event</th>
+            <th>Region</th>
+            <th>Dir.</th>
+            <th>Impact</th>
+            <th>Model +1W</th>
+            <th>Adj. +1W</th>
+            <th>Actual +1W</th>
+            <th>Winner</th>
+            <th>Notes</th>
+          </tr></thead>
+          <tbody id="journal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- /tab-adjustments -->
 
   <!-- Engine Log (collapsible) -->
@@ -724,7 +761,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 
 <script>
 // ═══════════════════════════════════════════════════════════
-// CONFIG  (v5 — optimized ensemble + regime detection)
+// CONFIG  (v6.2 — cross-tab consistency fixes + backtest ensemble parity)
 // ═══════════════════════════════════════════════════════════
 const API_KEY = 'pMqnFqpdhwFV0XzZGK0G5ECuAqx1N4v68AxsRBkI';
 const BASE = 'https://api.eia.gov/v2';
@@ -740,24 +777,11 @@ const NUM_MODELS = 5;        // v5: 3 primary + 2 fallback (same slots for compa
 const PADDS = ['NUS','R10','R20','R30','R40','R50'];
 const PL = {NUS:'U.S. Total',R10:'PADD 1 (East Coast)',R20:'PADD 2 (Midwest)',R30:'PADD 3 (Gulf Coast)',R40:'PADD 4 (Rocky Mtn)',R50:'PADD 5 (West Coast)'};
 
-const PRODUCTS = {
-  totalMotorGas: {
-    label: 'Total Motor Gasoline',
-    endpoint: 'stoc',
-    productCode: 'EPM0'
-  },
-  rbob: {
-    label: 'RBOB Blendstock',
-    endpoint: 'sndw',
-    productCode: 'EPOBGRR',
-    processCode: 'SAE'
-  },
-  cbob: {
-    label: 'CBOB Blendstock',
-    endpoint: 'sndw',
-    productCode: 'EPOBGCC',
-    processCode: 'SAE'
-  }
+const PRODUCT_KEY = 'totalMotorGas';
+const PRODUCT_CFG = {
+  label: 'Total Motor Gasoline',
+  endpoint: 'stoc',
+  productCode: 'EPM0'
 };
 
 // S&D data store — keyed like the dashboard: "category_product_area"
@@ -792,7 +816,7 @@ function getAdjPresets(eventType) {
 
   const app = window.__app;
   if (!app || !app.rawData || !app.currentSeries) return base.map(v => Math.round(v * 0.2));
-  const pk = document.getElementById('sel-product').value;
+  const pk = PRODUCT_KEY;
   const nusRaw = app.rawData[pk];
   if (!nusRaw) return base.map(v => Math.round(v * 0.2));
   const nusSeries = extractSeries(nusRaw, 'NUS');
@@ -821,17 +845,134 @@ function getAdjustedForecast(fc) {
 }
 
 function saveAdjustments() {
-  try { localStorage.setItem('gasoline_adj_v5', JSON.stringify(analystAdjustments)); } catch(e) {}
+  try { localStorage.setItem('total_gas_adj_v6', JSON.stringify(analystAdjustments)); } catch(e) {}
 }
 
 function loadAdjustments() {
   try {
-    const raw = localStorage.getItem('gasoline_adj_v5');
+    const raw = localStorage.getItem('total_gas_adj_v6');
     if (raw) {
       analystAdjustments = JSON.parse(raw);
       adjIdCounter = analystAdjustments.reduce((mx, a) => Math.max(mx, a.id || 0), 0) + 1;
     }
   } catch(e) { analystAdjustments = []; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADJUSTMENT JOURNAL — tracks adjustment accuracy over time
+// ═══════════════════════════════════════════════════════════
+const JOURNAL_KEY = 'total_gas_journal_v6';
+let adjustmentJournal = [];
+
+function loadJournal() {
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY);
+    if (raw) adjustmentJournal = JSON.parse(raw);
+  } catch(e) { adjustmentJournal = []; }
+}
+
+function saveJournal() {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(adjustmentJournal)); } catch(e) {}
+}
+
+// Called when user adds an adjustment — snapshot the current model state
+function journalLogAdjustment(adj, modelForecast, padd) {
+  const app = window.__app;
+  if (!app || !app.currentSeries || !modelForecast) return;
+  const lastDate = app.currentSeries[app.currentSeries.length - 1].date;
+  const ld = new Date(lastDate);
+  const forecastDates = Array.from({length: FC_WEEKS}, (_, h) => {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    return d.toISOString().split('T')[0];
+  });
+
+  const entry = {
+    id: Date.now(),
+    createdAt: new Date().toISOString(),
+    adjType: adj.type,
+    direction: adj.direction,
+    impact: adj.impact,
+    weeks: adj.weeks,
+    notes: adj.notes,
+    padd: padd,
+    dataAsOf: lastDate,
+    forecastDates: forecastDates,
+    modelEnsemble: modelForecast.ensemble.slice(),
+    adjustedEnsemble: modelForecast.ensemble.map((v, h) => v + (adj.weeks[h] ? adj.direction * adj.impact : 0)),
+    actuals: [null, null, null, null],
+    scored: false
+  };
+  adjustmentJournal.push(entry);
+  saveJournal();
+}
+
+// Called whenever new data loads — check if any journal entries can be scored
+function journalScoreEntries(series) {
+  if (!series || series.length === 0) return;
+  const dateMap = {};
+  series.forEach(d => dateMap[d.date] = d.value);
+
+  let updated = false;
+  for (const entry of adjustmentJournal) {
+    if (entry.scored) continue;
+    let allScored = true;
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] != null) continue;
+      const actual = dateMap[entry.forecastDates[h]];
+      if (actual != null) {
+        entry.actuals[h] = actual;
+        updated = true;
+      } else {
+        allScored = false;
+      }
+    }
+    // Mark as scored if at least week 1 has actual data
+    if (entry.actuals[0] != null) {
+      entry.scored = true;
+      updated = true;
+    }
+  }
+  if (updated) saveJournal();
+}
+
+// Calculate journal performance stats
+function getJournalStats() {
+  const scored = adjustmentJournal.filter(e => e.scored && e.actuals[0] != null);
+  if (scored.length === 0) return null;
+
+  let modelBetter = 0, adjBetter = 0, tie = 0;
+  let totalModelErr = 0, totalAdjErr = 0;
+  let byType = {};
+
+  for (const entry of scored) {
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] == null) continue;
+      const modelErr = Math.abs(entry.modelEnsemble[h] - entry.actuals[h]);
+      const adjErr = Math.abs(entry.adjustedEnsemble[h] - entry.actuals[h]);
+      totalModelErr += modelErr;
+      totalAdjErr += adjErr;
+      if (adjErr < modelErr) adjBetter++;
+      else if (modelErr < adjErr) modelBetter++;
+      else tie++;
+
+      if (!byType[entry.adjType]) byType[entry.adjType] = {modelErr: 0, adjErr: 0, count: 0};
+      byType[entry.adjType].modelErr += modelErr;
+      byType[entry.adjType].adjErr += adjErr;
+      byType[entry.adjType].count++;
+    }
+  }
+
+  const totalComparisons = modelBetter + adjBetter + tie;
+  return {
+    totalEntries: scored.length,
+    totalComparisons,
+    adjBetterPct: totalComparisons > 0 ? (adjBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    modelBetterPct: totalComparisons > 0 ? (modelBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    avgModelMAE: totalComparisons > 0 ? (totalModelErr / totalComparisons) : 0,
+    avgAdjMAE: totalComparisons > 0 ? (totalAdjErr / totalComparisons) : 0,
+    improvement: totalModelErr > 0 ? ((totalModelErr - totalAdjErr) / totalModelErr * 100).toFixed(1) : '0.0',
+    byType
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1115,7 +1256,7 @@ function estimatePaddDemand(padd, stockDates, paddSeries) {
   // We need the NUS stock data — pull from the app's rawData via extractSeries
   const app = window.__app;
   if (!app || !app.rawData) return null;
-  const productKey = document.getElementById('sel-product').value;
+  const productKey = PRODUCT_KEY;
   const nusRaw = app.rawData[productKey];
   if (!nusRaw) return null;
   const nusSeries = extractSeries(nusRaw, 'NUS');
@@ -1141,9 +1282,7 @@ function estimatePaddDemand(padd, stockDates, paddSeries) {
   const avgShare = recentShares.reduce((a, b) => a + b, 0) / recentShares.length;
 
   // Scale national demand by PADD share
-  const paddDemand = nationalDemand.map(v => v != null ? v * avgShare : null);
-  log(`  PADD demand est: ${(avgShare * 100).toFixed(1)}% of national`, 'ok');
-  return paddDemand;
+  return nationalDemand.map(v => v != null ? v * avgShare : null);
 }
 
 // Build S&D features object for a given PADD
@@ -1654,10 +1793,9 @@ function ols(X, y, ridge) {
 // ─── Weight Cache ───
 const WEIGHT_CACHE = new Map();
 function weightCacheKey(series) {
-  // Cache key = product + region + last date + length
-  const pk = document.getElementById('sel-product').value;
-  const padd = document.getElementById('sel-padd').value;
-  return pk + '_' + padd + '_' + series[series.length - 1].date + '_' + series.length;
+  const lastDate = series[series.length - 1].date;
+  const lastVal = series[series.length - 1].value;
+  return PRODUCT_KEY + '_' + lastDate + '_' + series.length + '_' + lastVal;
 }
 
 // ─── Stacked Meta-Learner ───
@@ -1704,16 +1842,14 @@ function trainMetaLearner(series, sdF) {
 }
 
 // ─── Ensemble Engine (v5 — regime-aware meta-learner) ───
-function runEnsemble(series, sdF, horizon) {
+function runEnsemble(series, sdF, horizon, quiet) {
   const regime = detectRegime(series, sdF);
   const hasSdData = countSDFeatures(sdF) >= 3;
 
-  // Primary models (always run)
   const m1 = sdRegression(series, sdF, horizon);
   const m2 = sdBalanceModel(series, sdF, horizon);
   const m3 = arModel(series, horizon);
 
-  // Fallback models (only when S&D data unavailable or primary models fail)
   const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
   const needFallback = !hasSdData || primaryCount < 2;
   const m4 = needFallback ? seasonalNaive(series, horizon) : null;
@@ -1723,7 +1859,6 @@ function runEnsemble(series, sdF, horizon) {
   const names = ['S&D Reg', 'S&D Balance', 'AR Model', 'Seasonal*', 'Holt-Win*'];
   const activeCount = models.filter(m => m !== null).length;
 
-  // Try meta-learner first
   const cacheKey = weightCacheKey(series);
   let metaModel = WEIGHT_CACHE.get(cacheKey + '_meta');
   if (!metaModel) {
@@ -1731,16 +1866,17 @@ function runEnsemble(series, sdF, horizon) {
     if (metaModel) WEIGHT_CACHE.set(cacheKey + '_meta', metaModel);
   }
 
-  // Get inverse-MAE weights as fallback/blend
   let w = WEIGHT_CACHE.get(cacheKey + '_weights');
   if (!w) {
     w = calcWeights(series, sdF, needFallback);
     WEIGHT_CACHE.set(cacheKey + '_weights', w);
   }
 
-  const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
-  log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
-  log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+  if (!quiet) {
+    const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
+    log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
+    log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+  }
 
   const fc = [];
   for (let h = 0; h < horizon; h++) {
@@ -1779,6 +1915,9 @@ function runEnsemble(series, sdF, horizon) {
     sdReg: m1 || fc,
     sdBalance: m2 || fc,
     arModel: m3 || fc,
+    sdRegRaw: m1,
+    sdBalanceRaw: m2,
+    arModelRaw: m3,
     seasonal: m4 || (needFallback ? fc : null),
     holtWinters: m5 || (needFallback ? fc : null),
     weights: w,
@@ -1881,14 +2020,18 @@ function calcCI(series, sdF) {
     }
   }
 
-  // Metrics: backtest ensemble accuracy
+  // Metrics: backtest ensemble accuracy — use real S&D features for consistency
   const metricWindow = Math.min(VAL_WEEKS, Math.floor(n * 0.1));
   let mape = 0, mae = 0, dOk = 0, dN = 0, mCnt = 0;
   for (let w = 1; w <= metricWindow; w++) {
     const sub = series.slice(0, n - metricWindow + w - 1);
     const act = series[n - metricWindow + w - 1].value;
+    const sdSub = {};
+    for (const k of Object.keys(sdF)) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, n - metricWindow + w - 1);
+    }
     try {
-      const fc = runEnsembleRaw(sub, {}, 1);
+      const fc = runEnsembleRaw(sub, sdSub, 1);
       if (fc && fc[0] != null) {
         const e = Math.abs(fc[0] - act);
         mae += e;
@@ -1931,6 +2074,65 @@ function runEnsembleRaw(series, sdF, horizon) {
     fc.push(cnt > 0 ? sum / cnt : series[series.length - 1].value);
   }
   return fc;
+}
+
+// Lite ensemble — runs 3 models + applies cached weights/meta-learner.
+// Skips CI, metrics, weight training, and meta-learner training.
+// Used by backtest and cross-PADD snapshot for performance.
+function runEnsembleLite(series, sdF, horizon) {
+  const regime = detectRegime(series, sdF);
+  const hasSdData = countSDFeatures(sdF) >= 3;
+
+  const m1 = sdRegression(series, sdF, horizon);
+  const m2 = sdBalanceModel(series, sdF, horizon);
+  const m3 = arModel(series, horizon);
+
+  const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+  const needFallback = !hasSdData || primaryCount < 2;
+  const m4 = needFallback ? seasonalNaive(series, horizon) : null;
+  const m5 = needFallback ? holtWinters(series, horizon) : null;
+  const models = [m1, m2, m3, m4, m5];
+
+  // Use cached meta-learner + weights if available, otherwise use defaults
+  const cacheKey = weightCacheKey(series);
+  const metaModel = WEIGHT_CACHE.get(cacheKey + '_meta') || null;
+  const w = WEIGHT_CACHE.get(cacheKey + '_weights') ||
+            (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+  const fc = [];
+  for (let h = 0; h < horizon; h++) {
+    let val = null;
+    if (metaModel && m1 && m2 && m3) {
+      const rf = regimeFeatures(regime);
+      const metaFeatures = [m1[h], m2[h], m3[h], ...rf];
+      val = metaModel.coeffs[0];
+      for (let j = 0; j < metaFeatures.length; j++) val += metaModel.coeffs[j + 1] * metaFeatures[j];
+      const modelOutputs = [m1[h], m2[h], m3[h]];
+      const mn = Math.min(...modelOutputs), mx = Math.max(...modelOutputs);
+      const range = mx - mn;
+      if (val < mn - range * 0.5 || val > mx + range * 0.5) val = null;
+    }
+    if (val == null) {
+      let ws = 0, vs = 0;
+      for (let i = 0; i < NUM_MODELS; i++) {
+        if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+      }
+      val = ws > 0 ? vs / ws : series[series.length - 1].value;
+    }
+    fc.push(val);
+  }
+
+  return {
+    ensemble: fc,
+    sdReg: m1 || fc,
+    sdBalance: m2 || fc,
+    arModel: m3 || fc,
+    sdRegRaw: m1,
+    sdBalanceRaw: m2,
+    arModelRaw: m3,
+    regime,
+    weights: w
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2672,6 +2874,94 @@ function refreshChartWithAdjustments() {
   }
 }
 
+function renderJournalUI() {
+  const stats = getJournalStats();
+  const scored = adjustmentJournal.filter(e => e.scored);
+  const empty = document.getElementById('journal-empty');
+  const scorecard = document.getElementById('journal-scorecard');
+  const table = document.getElementById('journal-table');
+  const tbody = document.getElementById('journal-tbody');
+
+  if (!stats || scored.length === 0) {
+    empty.style.display = '';
+    scorecard.style.display = 'none';
+    table.style.display = 'none';
+    // Show pending count if any
+    const pending = adjustmentJournal.filter(e => !e.scored).length;
+    if (pending > 0) {
+      empty.textContent = `${pending} adjustment(s) logged and awaiting actual data for scoring.`;
+    } else {
+      empty.textContent = 'No journal entries yet. Add adjustments and wait for actual data to arrive for scoring.';
+    }
+    return;
+  }
+
+  empty.style.display = 'none';
+  scorecard.style.display = '';
+  table.style.display = '';
+
+  // Scorecard
+  document.getElementById('j-entries').textContent = stats.totalEntries;
+  document.getElementById('j-adj-pct').textContent = stats.adjBetterPct + '%';
+  document.getElementById('j-model-pct').textContent = stats.modelBetterPct + '%';
+  const improv = parseFloat(stats.improvement);
+  document.getElementById('j-improvement').textContent = (improv >= 0 ? '+' : '') + stats.improvement + '%';
+  document.getElementById('j-improvement').style.color = improv >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('j-model-mae').textContent = fmtVal(stats.avgModelMAE);
+  document.getElementById('j-adj-mae').textContent = fmtVal(stats.avgAdjMAE);
+
+  // Quality indicators
+  const adjPctEl = document.getElementById('j-adj-pct');
+  const pctVal = parseFloat(stats.adjBetterPct);
+  adjPctEl.style.color = pctVal >= 55 ? 'var(--accent-green)' : pctVal >= 45 ? 'var(--accent-orange)' : 'var(--accent-red)';
+
+  // Table
+  let html = '';
+  for (const entry of scored) {
+    const modelErr = entry.actuals[0] != null ? Math.abs(entry.modelEnsemble[0] - entry.actuals[0]) : null;
+    const adjErr = entry.actuals[0] != null ? Math.abs(entry.adjustedEnsemble[0] - entry.actuals[0]) : null;
+    let winner = '—', winClass = '';
+    if (modelErr != null && adjErr != null) {
+      if (adjErr < modelErr) { winner = 'Adj.'; winClass = 'adj-positive'; }
+      else if (modelErr < adjErr) { winner = 'Model'; winClass = 'adj-negative'; }
+      else { winner = 'Tie'; }
+    }
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr>
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td>${entry.actuals[0] != null ? fmtVal(entry.actuals[0]) : '<em>pending</em>'}</td>
+      <td class="${winClass}" style="font-weight:600">${winner}</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  // Also show pending entries
+  const pending = adjustmentJournal.filter(e => !e.scored);
+  for (const entry of pending) {
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr style="opacity:.6">
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td><em>awaiting data</em></td>
+      <td>—</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
 // ═══════════════════════════════════════════════════════════
 // CSV EXPORT
 // ═══════════════════════════════════════════════════════════
@@ -2698,7 +2988,7 @@ function exportCSV(series, fc) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `total_gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   log('CSV exported' + (hasAdj ? ' (includes analyst adjustments)' : ''), 'ok');
@@ -2711,26 +3001,22 @@ const APP = window.__app = {
   rawData: {},
   currentSeries: null,
   currentFc: null,
-  dataLoadedAt: 0, // timestamp of last data fetch
-  DATA_TTL: 30 * 60 * 1000, // refresh if data older than 30 minutes
+  forecastCache: {},  // per-PADD forecast cache keyed by padd + lastDate
+  dataLoadedAt: 0,
+  DATA_TTL: 30 * 60 * 1000,
 
   async init() {
-    log('Gasoline Stock Prediction Engine v5.0', 'ok');
+    log('Total Gasoline Stocks Model v6.2', 'ok');
     log('Primary: S&D Regression (feat-selected) + S&D Balance (seasonal) + AR(6)', 'ok');
-    log('v5: Regime detection, meta-learner, cached weights, 52-wk CI window', 'ok');
+    log('v6.2: Cross-tab consistency, ensemble-parity backtest, S&D-aware metrics', 'ok');
 
     setLoader(10, 'Loading stock data...');
 
-    for (const [key, cfg] of Object.entries(PRODUCTS)) {
+    {
+      const cfg = PRODUCT_CFG;
       log(`Loading ${cfg.label}...`);
-      let url;
-      if (cfg.endpoint === 'stoc') {
-        url = stocUrl(cfg.productCode);
-      } else {
-        url = sndwStockUrl(cfg.productCode, cfg.processCode);
-      }
-      log(`  URL: .../${cfg.endpoint}/... product=${cfg.productCode}${cfg.processCode ? ' process=' + cfg.processCode : ''}`);
-
+      const url = stocUrl(cfg.productCode);
+      log(`  URL: .../stoc/... product=${cfg.productCode}`);
       const r = await tfetch(url);
       const n = r?.response?.data?.length || 0;
       if (n > 0) {
@@ -2741,14 +3027,14 @@ const APP = window.__app = {
           const sample = testSeries.slice(-3).map(d => `${d.date}=${d.value}`).join(', ');
           log(`  Latest: ${sample}`);
         }
-        this.rawData[key] = r;
+        this.rawData[PRODUCT_KEY] = r;
       } else {
         log(`  No data returned`, 'warn');
       }
     }
 
     const loaded = Object.keys(this.rawData).length;
-    log(`Products loaded: ${loaded}/${Object.keys(PRODUCTS).length}`, loaded > 0 ? 'ok' : 'err');
+    log(`Data loaded: ${loaded > 0 ? 'OK' : 'FAILED'}`, loaded > 0 ? 'ok' : 'err');
 
     if (loaded === 0) {
       log('FATAL: No data loaded. Check API key.', 'err');
@@ -2785,8 +3071,8 @@ const APP = window.__app = {
     setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); setStatus('ready', 'READY'); }, 500);
 
     // Event listeners
-    document.getElementById('btn-run').addEventListener('click', () => this.runForecast());
-    document.getElementById('sel-product').addEventListener('change', () => this.runForecast());
+    document.getElementById('btn-run').addEventListener('click', () => this.runForecast(true));
+    // No product selector — Total Motor Gasoline only
     document.getElementById('sel-padd').addEventListener('change', () => this.runForecast());
 
     document.getElementById('btn-refresh').addEventListener('click', async () => {
@@ -2794,20 +3080,22 @@ const APP = window.__app = {
       setStatus('loading', 'REFRESHING...');
       for (const key in cache) delete cache[key];
       for (const key in SD_DATA) delete SD_DATA[key];
+      WEIGHT_CACHE.clear();
       this.rawData = {};
       this.currentSeries = null;
       this.currentFc = null;
-      for (const [key, cfg] of Object.entries(PRODUCTS)) {
-        log(`Reloading ${cfg.label}...`);
-        const url = cfg.endpoint === 'stoc' ? stocUrl(cfg.productCode) : sndwStockUrl(cfg.productCode, cfg.processCode);
+      this.forecastCache = {};
+      {
+        log(`Reloading ${PRODUCT_CFG.label}...`);
+        const url = stocUrl(PRODUCT_CFG.productCode);
         const r = await tfetch(url);
         const n = r?.response?.data?.length || 0;
         if (n > 0) {
-          this.rawData[key] = r;
+          this.rawData[PRODUCT_KEY] = r;
           const testSeries = extractSeries(r, 'NUS');
-          log(`  OK ${cfg.label}: ${testSeries.length} wks`, 'ok');
+          log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
         } else {
-          log(`  ${cfg.label}: no data`, 'warn');
+          log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
         }
       }
       // Re-fetch S&D data
@@ -2831,112 +3119,135 @@ const APP = window.__app = {
     const helpOverlay = document.getElementById('help-modal-overlay');
     const helpBody = document.getElementById('help-modal-body');
     const HELP_HTML = `
-<h1>Gasoline Stock Predictions v5</h1>
-<p>A single-file, browser-based dashboard for forecasting weekly US gasoline inventory levels using EIA petroleum data. Built for commodity traders and analysts tracking RBOB, CBOB, and total motor gasoline stocks across US PADD regions.</p>
+<h1>Total Gasoline Stocks Model v6.2</h1>
+<p>A single-file, browser-based dashboard for forecasting weekly US <strong>Total Motor Gasoline</strong> inventory levels using live EIA petroleum data. Covers US Total and all five PADD regions with analyst adjustment journaling and forward-tracking accuracy scoring.</p>
 <hr>
 <h2>Overview</h2>
-<p>This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels <strong>1\u20134 weeks forward</strong>. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.</p>
-<p><strong>Products supported:</strong></p>
+<p>This model fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast to predict gasoline stock levels <strong>1\u20134 weeks forward</strong>. Three fundamental models feed into a meta-learner that adapts its blending weights based on the current market regime.</p>
+<p><strong>Product:</strong> Total Motor Gasoline (EIA code: EPM0)</p>
+<p><strong>Regions:</strong></p>
 <ul>
-<li>Total Motor Gasoline (EPM0)</li>
-<li>RBOB Gasoline (EPOBGRR)</li>
-<li>CBOB Gasoline (EPOBGCC)</li>
-</ul>
-<p><strong>Regions supported:</strong></p>
-<ul>
-<li>US Total (NUS)</li>
-<li>PADD 1 (East Coast)</li>
-<li>PADD 2 (Midwest)</li>
-<li>PADD 3 (Gulf Coast)</li>
-<li>PADD 4 (Rocky Mountain)</li>
-<li>PADD 5 (West Coast)</li>
+<li>U.S. Total (NUS)</li>
+<li>PADD 1 \u2014 East Coast</li>
+<li>PADD 2 \u2014 Midwest</li>
+<li>PADD 3 \u2014 Gulf Coast</li>
+<li>PADD 4 \u2014 Rocky Mountain</li>
+<li>PADD 5 \u2014 West Coast</li>
 </ul>
 <hr>
-<h2>How It Works</h2>
-<h3>Data Inputs</h3>
-<p>All data is pulled from the EIA API v2 (<code>api.eia.gov/v2/petroleum/</code>):</p>
+<h2>Data Inputs</h2>
+<p>All data is pulled live from the <code>EIA API v2</code>:</p>
 <table>
 <tr><th>Series</th><th>Description</th></tr>
-<tr><td>Weekly stocks</td><td>Primary target variable (kbbl)</td></tr>
-<tr><td>Production</td><td>Domestic refinery output</td></tr>
-<tr><td>Imports / Exports</td><td>Trade flows</td></tr>
-<tr><td>Refinery utilization</td><td>Capacity utilization rate</td></tr>
-<tr><td>Demand (product supplied)</td><td>Implied consumption</td></tr>
+<tr><td>Weekly Stocks</td><td>Primary target variable (kbbl)</td></tr>
+<tr><td>Production</td><td>Finished gasoline output from refineries</td></tr>
+<tr><td>Imports / Exports</td><td>Trade flows (gasoline, RBOB, CBOB)</td></tr>
+<tr><td>Refinery Utilization</td><td>Capacity utilization rate (%)</td></tr>
+<tr><td>Crude Inputs</td><td>Crude oil input to refineries</td></tr>
+<tr><td>Blender Inputs</td><td>RBOB and CBOB blender net inputs</td></tr>
+<tr><td>Demand (Product Supplied)</td><td>Implied weekly consumption (US-total only; PADD demand estimated via stock-share proportioning)</td></tr>
 </table>
-<p>Data is cached in memory with a 30-minute TTL and auto-refreshes when you click <strong>Run Forecast</strong>.</p>
+<p>Data is cached in-memory with a <strong>30-minute TTL</strong> and auto-refreshes when stale. Up to <strong>8 S&amp;D feature series</strong> are loaded per region.</p>
 <hr>
-<h3>Prediction Models</h3>
-<p>Three primary models form the base layer of the ensemble:</p>
+<h2>Prediction Models</h2>
+<p>Three primary models form the base layer:</p>
 <h3>1. S&amp;D Regression</h3>
-<p>A ridge regression (\u03bb = 1.0) trained on supply-and-demand features. Uses forward stepwise feature selection to choose the most predictive subset from ~10 candidate features: lagged production, import delta, export delta, refinery utilization change, demand delta, and their recent trends.</p>
+<p>Ridge regression (\u03bb = 1.0) with <strong>forward stepwise feature selection</strong>. Starts with core features (seasonality harmonics, momentum, YoY change) and greedily adds S&amp;D features only if they improve out-of-sample validation accuracy. Prevents overfitting to noisy inputs.</p>
 <h3>2. S&amp;D Balance</h3>
-<p>A seasonally-aware projection model. Computes the implied weekly stock change from net supply minus demand, then anchors the forecast to same-week-last-year stock levels, blending recent build/draw trajectory with seasonal norms.</p>
-<h3>3. AR(6) Autoregressive Model</h3>
-<p>An autoregressive model using the prior 6 weeks of stock levels. Captures momentum and mean reversion. Acts as a pure time-series baseline.</p>
-<p><strong>Fallback models</strong> (used when S&amp;D data is unavailable):</p>
+<p>Seasonally-aware flow model. Computes implied weekly stock change from Production + Imports \u2013 Exports \u2013 Demand, calibrated against actual stock changes over the last 26 weeks. Projects forward using <strong>same-week-last-year</strong> component values adjusted by current deviation from seasonal norms.</p>
+<h3>3. AR(6) Autoregressive</h3>
+<p>Pure time-series model using lags 1\u20136 plus a seasonal lag (week 52). Captures momentum and mean reversion. Acts as the baseline when S&amp;D data is sparse.</p>
+<p><strong>Fallback models</strong> (activated only when S&amp;D data is insufficient):</p>
 <ul>
-<li><strong>Seasonal Naive</strong>: Projects same-week-last-year stock level forward</li>
-<li><strong>Holt-Winters</strong>: Exponential smoothing with trend and seasonality components</li>
+<li><strong>Seasonal Naive</strong> \u2014 Weighted multi-year same-week average with trend adjustment</li>
+<li><strong>Holt-Winters</strong> \u2014 Exponential smoothing with grid-searched \u03b1, \u03b2, \u03b3 parameters</li>
 </ul>
 <hr>
-<h3>Regime Detection</h3>
-<p>Before blending, the model detects the current market regime using five signals:</p>
+<h2>Regime Detection</h2>
+<p>Before blending, the model classifies the current market environment using 7 features:</p>
 <table>
 <tr><th>Feature</th><th>Description</th></tr>
-<tr><td>Season</td><td>Categorical: build (Oct\u2013Mar), draw (Apr\u2013Sep), peak (Jul\u2013Aug), shoulder (Sep/Apr)</td></tr>
-<tr><td>Volatility ratio</td><td>8-week vs. 52-week realized stock volatility</td></tr>
-<tr><td>Turnaround flag</td><td>Binary: refinery utilization dropped &gt;3 pts over 4 weeks</td></tr>
-<tr><td>Momentum</td><td>Direction and magnitude of recent 4-week stock change</td></tr>
-<tr><td>Season \u00d7 Volatility</td><td>Interaction term</td></tr>
+<tr><td>Season (4 one-hot)</td><td><strong>Draw</strong> (wk 10\u201324), <strong>Peak</strong> (wk 25\u201336), <strong>Build</strong> (wk 37\u201346), <strong>Shoulder</strong> (wk 47\u20139)</td></tr>
+<tr><td>Volatility ratio</td><td>Recent 8-week vol \u00f7 trailing 52-week vol (&gt;1.5\u00d7 = high volatility)</td></tr>
+<tr><td>Turnaround flag</td><td>Refinery utilization dropped &gt;3 pts in 4 weeks</td></tr>
+<tr><td>Momentum</td><td>4-week stock change acceleration/deceleration (kbbl)</td></tr>
 </table>
 <hr>
-<h3>Meta-Learner (Ensemble Model)</h3>
-<p>The meta-learner is a ridge regression (\u03bb = 0.5) trained on a rolling 30-week backtest. It learns 10 coefficients:</p>
+<h2>Meta-Learner (Ensemble Blending)</h2>
+<p>A ridge regression (\u03bb = 0.5) trained on 30-week rolling backtest data. Learns <strong>10 coefficients</strong>:</p>
 <ul>
-<li><strong>1 intercept</strong></li>
-<li><strong>3 model blend weights</strong> \u2014 how much to trust S&amp;D Regression, S&amp;D Balance, and AR(6)</li>
-<li><strong>7 regime bias adjustments</strong> \u2014 how each regime feature should shift the final prediction</li>
+<li>1 intercept</li>
+<li>3 model blend weights \u2014 how much to trust each base model</li>
+<li>7 regime bias adjustments \u2014 regime-conditional corrections in kbbl</li>
 </ul>
-<p>When fewer than 30 backtest samples exist, the meta-learner falls back to an <strong>inverse-MAE weighted average</strong> with exponential decay.</p>
+<p>A <strong>sanity check</strong> bounds the meta-learner output to \u00b150% of the model spread. If it extrapolates too far, the system falls back to inverse-MAE weighted averaging with exponential decay (most recent weeks weighted highest).</p>
 <hr>
-<h3>Confidence Intervals</h3>
-<p>80% confidence intervals are computed from a 52-week rolling backtest window. The 10th and 90th percentile of residuals define the CI band, scaled forward by forecast horizon.</p>
+<h2>Confidence Intervals</h2>
+<p>80% CIs are computed from a <strong>52-week</strong> rolling backtest window. The 10th and 90th percentile of historical ensemble residuals define the band at each forecast horizon. Falls back to scaled standard deviation when backtest sample is too small.</p>
 <hr>
-<h2>Dashboard Features</h2>
-<h3>Main Forecast Tab</h3>
+<h2>Dashboard Tabs</h2>
+<h3>Forecast Tab</h3>
 <ul>
-<li>Interactive Chart.js time series with 5-year seasonal average band</li>
-<li>Historical stocks, ensemble forecast, and 80% CI shading</li>
-<li>Forecast table with all model outputs (kbbl)</li>
-<li>CSV export of full forecast table</li>
-<li>Scatter plot: Predicted vs. Actual for backtest window</li>
+<li><strong>Forecast cards</strong>: +1W through +4W predictions with % change badges, 80% CI ranges, and YoY comparisons</li>
+<li><strong>Interactive chart</strong>: Historical stocks, ensemble line, individual model lines, adjusted ensemble (when active), and optional 5-year avg band</li>
+<li><strong>Cross-PADD Snapshot</strong>: All 6 regions\u2019 latest stocks, weekly change, +1W and +4W forecasts (computed with full S&amp;D features for each PADD), and position vs. 5-year average</li>
+<li><strong>Detailed forecast table</strong>: All model outputs, CI bounds, with adjusted column when adjustments are active</li>
+<li><strong>CSV export</strong>: Full forecast including adjusted values if applicable</li>
+</ul>
+<h3>Backtest Tab</h3>
+<ul>
+<li><strong>Rolling backtest</strong>: Runs the full ensemble (including meta-learner and regime detection) at each historical point</li>
+<li><strong>Summary stats</strong>: MAPE, MAE, directional accuracy, sample count</li>
+<li><strong>Per-model MAE comparison</strong>: Visual bars comparing Ensemble vs. S&amp;D Reg vs. S&amp;D Balance vs. AR</li>
+<li><strong>Scatter plot</strong>: Predicted vs. Actual with perfect-line reference</li>
+<li>Configurable horizon (+1W to +4W) and window (26, 52, or 104 weeks)</li>
 </ul>
 <h3>Meta-Learner Tab</h3>
 <ul>
-<li><strong>Summary stats</strong>: R\u00b2, MAPE, directional accuracy</li>
-<li><strong>Current regime</strong>: Active regime features and their values</li>
-<li><strong>Model blend weights chart</strong>: Coefficients for each base model</li>
-<li><strong>Regime bias chart</strong>: All 7 regime coefficients, with active features highlighted</li>
-<li><strong>Blending walkthrough</strong>: Step-by-step table showing how each component contributes</li>
+<li><strong>Current regime</strong>: Season, volatility, turnaround, momentum</li>
+<li><strong>Regime feature vector</strong>: All 7 features the meta-learner sees</li>
+<li><strong>Model blend weights chart</strong>: Bar chart of the 3 base model coefficients</li>
+<li><strong>Regime bias chart</strong>: All 7 regime coefficients with active features highlighted</li>
+<li><strong>Blending walkthrough</strong>: Step-by-step table showing intercept + model contributions + regime biases = final output</li>
+<li><strong>Fallback weights</strong>: Inverse-MAE weights used when meta-learner is inactive</li>
+</ul>
+<h3>Analyst Adjustments Tab</h3>
+<ul>
+<li><strong>Adjustment builder</strong>: Add qualitative overlays (refinery outage, weather event, demand shock, etc.) with direction (Bullish/Bearish), magnitude in kbbl, and affected weeks</li>
+<li><strong>Smart presets</strong>: Impact suggestions auto-scaled by region\u2019s share of national stocks</li>
+<li><strong>Active adjustments table</strong>: Shows all current adjustments with net impact per forecast week</li>
+<li><strong>Adjusted vs. Model comparison</strong>: Side-by-side table of model ensemble vs. adjusted forecast</li>
+<li><strong>Adjustment Journal</strong>: Forward-tracking performance scorer. When you add an adjustment, it snapshots the model forecast. As actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone. Tracks win rate, MAE improvement, and per-entry detail.</li>
 </ul>
 <hr>
 <h2>Usage</h2>
 <ol>
-<li>Open the dashboard in any modern browser</li>
-<li>Enter your EIA API key (free at <a href="https://www.eia.gov/opendata/" target="_blank">eia.gov/opendata</a>)</li>
-<li>Select product and PADD region</li>
-<li>Click <strong>Run Forecast</strong></li>
-<li>Adjust forecast horizon (1\u20134 weeks) as needed</li>
-<li>Use the <strong>Meta-Learner</strong> tab to inspect model internals</li>
-<li>Export forecast to CSV if needed</li>
+<li>Open this file in any modern browser (no install or server required)</li>
+<li>Select a PADD region from the dropdown (defaults to U.S. Total)</li>
+<li>Click <strong>\u25b6 Run Forecast</strong> to generate the ensemble prediction</li>
+<li>Explore individual model contributions in the chart legend</li>
+<li>Run a <strong>Backtest</strong> to validate model accuracy over the last 26\u2013104 weeks</li>
+<li>Use the <strong>Meta-Learner</strong> tab to understand how models are being blended</li>
+<li>Add <strong>Analyst Adjustments</strong> to overlay qualitative views on the forecast</li>
+<li>Track your adjustment accuracy over time in the <strong>Adjustment Journal</strong></li>
+<li>Export forecasts to CSV with the \u2193 button</li>
 </ol>
-<blockquote><strong>Note on performance by region/product:</strong> Forecast accuracy is highest for US Total Motor Gasoline due to the volume of EIA data available. Individual PADD regions and sub-products (RBOB, CBOB) show higher MAPE and lower directional accuracy because stock levels are smaller in absolute terms.</blockquote>
+<blockquote><strong>PADD accuracy note:</strong> Forecast accuracy is highest for U.S. Total due to the volume of EIA data available. Individual PADD regions show higher MAPE because stock levels are smaller and S&amp;D data is sparser. PADD-level demand is estimated via stock-share proportioning of national product supplied data.</blockquote>
+<hr>
+<h2>V2 Changes</h2>
+<ul>
+<li><strong>Cross-PADD Snapshot</strong> now runs the full ensemble with real S&amp;D features for each PADD, matching Forecast tab calculations exactly</li>
+<li><strong>Backtest engine</strong> now uses the complete <code>runEnsemble()</code> pipeline (meta-learner + regime detection + inverse-MAE weighting) instead of a simple model average</li>
+<li><strong>Forecast metrics</strong> (MAPE, MAE, direction accuracy) now use S&amp;D features during their backtest validation, consistent with the live forecast</li>
+<li>All tabs share the same ensemble computation path \u2014 no divergence between what the Forecast tab shows and what Backtest or Cross-PADD reports</li>
+</ul>
 <hr>
 <h2>Technical Notes</h2>
 <ul>
-<li><strong>No build tools required.</strong> All dependencies load from CDN (Chart.js, Papa Parse).</li>
+<li><strong>No build tools required.</strong> Single HTML file with CDN dependencies (Chart.js 4.4.4).</li>
 <li><strong>No backend.</strong> All computation runs client-side in the browser.</li>
-<li>Data units throughout are <strong>Thousand Barrels (kbbl)</strong>, consistent with EIA reporting.</li>
+<li><strong>Data units:</strong> Thousand Barrels (kbbl) throughout, consistent with EIA reporting.</li>
+<li><strong>Persistence:</strong> Analyst adjustments and journal entries are stored in <code>localStorage</code>.</li>
 </ul>
 `;
     helpBody.innerHTML = HELP_HTML;
@@ -3017,8 +3328,10 @@ const APP = window.__app = {
 
     // ─── Analyst Adjustments handlers ───
     loadAdjustments();
+    loadJournal();
     updateAdjPresetButtons();
     renderAdjustmentsTable();
+    renderJournalUI();
 
     document.getElementById('adj-type').addEventListener('change', updateAdjPresetButtons);
     document.getElementById('sel-padd').addEventListener('change', updateAdjPresetButtons);
@@ -3042,21 +3355,26 @@ const APP = window.__app = {
       });
       if (!weeks.some(w => w)) { log('Select at least one week', 'warn'); return; }
 
-      analystAdjustments.push({
+      const newAdj = {
         id: adjIdCounter++,
         type: document.getElementById('adj-type').value,
         direction: parseInt(dir) || 1,
         impact: impact,
         weeks: weeks,
         notes: document.getElementById('adj-notes').value.trim()
-      });
+      };
+      analystAdjustments.push(newAdj);
       saveAdjustments();
+      // Log to journal for future scoring
+      const padd = document.getElementById('sel-padd').value;
+      if (this.currentFc) journalLogAdjustment(newAdj, this.currentFc, padd);
       renderAdjustmentsTable();
       updateAdjCompare();
       refreshChartWithAdjustments();
+      renderJournalUI();
       document.getElementById('adj-impact').value = '';
       document.getElementById('adj-notes').value = '';
-      log(`Adjustment added: ${ADJ_TYPE_LABELS[document.getElementById('adj-type').value]} ${impact.toLocaleString()} kbbl`, 'ok');
+      log(`Adjustment added & logged to journal: ${ADJ_TYPE_LABELS[newAdj.type]} ${impact.toLocaleString()} kbbl`, 'ok');
     });
 
     // Clear all adjustments
@@ -3069,6 +3387,14 @@ const APP = window.__app = {
       updateAdjCompare();
       refreshChartWithAdjustments();
       log('All adjustments cleared', 'ok');
+    });
+
+    document.getElementById('btn-journal-clear').addEventListener('click', () => {
+      if (adjustmentJournal.length === 0) return;
+      adjustmentJournal = [];
+      saveJournal();
+      renderJournalUI();
+      log('Adjustment journal cleared', 'ok');
     });
   },
 
@@ -3110,17 +3436,18 @@ const APP = window.__app = {
     this.rawData = {};
     this.currentSeries = null;
     this.currentFc = null;
-    for (const [key, cfg] of Object.entries(PRODUCTS)) {
-      log(`Reloading ${cfg.label}...`);
-      const url = cfg.endpoint === 'stoc' ? stocUrl(cfg.productCode) : sndwStockUrl(cfg.productCode, cfg.processCode);
+    this.forecastCache = {};
+    {
+      log(`Reloading ${PRODUCT_CFG.label}...`);
+      const url = stocUrl(PRODUCT_CFG.productCode);
       const r = await tfetch(url);
       const n = r?.response?.data?.length || 0;
       if (n > 0) {
-        this.rawData[key] = r;
+        this.rawData[PRODUCT_KEY] = r;
         const testSeries = extractSeries(r, 'NUS');
-        log(`  OK ${cfg.label}: ${testSeries.length} wks`, 'ok');
+        log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
       } else {
-        log(`  ${cfg.label}: no data`, 'warn');
+        log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
       }
     }
     log('Reloading S&D data...', 'ok');
@@ -3130,25 +3457,35 @@ const APP = window.__app = {
     log('Auto-refresh complete', 'ok');
   },
 
-  async runForecast() {
+  async runForecast(forceRefresh) {
     await this.refreshIfStale();
-    const pk = document.getElementById('sel-product').value;
+    const pk = PRODUCT_KEY;
     const padd = document.getElementById('sel-padd').value;
-    setStatus('loading', 'FORECASTING...');
-    log(`--- ${PRODUCTS[pk].label} / ${PL[padd]} ---`);
 
     const api = this.rawData[pk];
     if (!api) { log('No data for this product', 'err'); setStatus('error', 'NO DATA'); return; }
 
     const series = extractSeries(api, padd);
     if (series.length < 20) { log(`Only ${series.length} weeks, need 20+`, 'err'); setStatus('error', 'INSUFFICIENT'); return; }
+
+    const latestDate = series[series.length - 1].date;
+    const cacheHit = !forceRefresh && this.forecastCache[padd] && this.forecastCache[padd].asOf === latestDate;
+
+    if (cacheHit) {
+      log(`--- ${PL[padd]} (cached) ---`);
+      const cached = this.forecastCache[padd];
+      this.currentSeries = cached.series;
+      this.currentFc = cached.fc;
+      this._renderForecastUI(cached.series, cached.fc, api);
+      return;
+    }
+
+    setStatus('loading', 'FORECASTING...');
+    log(`--- ${PRODUCT_CFG.label} / ${PL[padd]} ---`);
     log(`${series.length} weeks (${series[0].date} to ${series[series.length - 1].date})`);
 
-    // Update data badge
-    const latestDate = series[series.length - 1].date;
     document.getElementById('data-badge').innerHTML = `Latest: <strong>${latestDate}</strong>`;
 
-    // v4: Build real S&D features aligned to this series
     const stockDates = series.map(d => d.date);
     const sdF = buildSDFeatures(padd, stockDates, series);
     const sdCount = countSDFeatures(sdF);
@@ -3157,14 +3494,24 @@ const APP = window.__app = {
     const fc = runEnsemble(series, sdF, FC_WEEKS);
     const last = series[series.length - 1].value;
 
+    // Cache this forecast
+    this.forecastCache[padd] = { series, fc, asOf: latestDate };
+
+    this._renderForecastUI(series, fc, api);
+  },
+
+  _renderForecastUI(series, fc, api) {
+    const last = series[series.length - 1].value;
+    const ld = new Date(series[series.length - 1].date);
+
+    document.getElementById('data-badge').innerHTML = `Latest: <strong>${series[series.length - 1].date}</strong>`;
+
     // Year-over-year for forecast dates
     const yoyData = [];
-    const ld = new Date(series[series.length - 1].date);
     for (let h = 0; h < 4; h++) {
       const fd = new Date(ld); fd.setDate(fd.getDate() + 7 * (h + 1));
       const wk = weekOfYear(fd.toISOString().split('T')[0]);
       const yr = fd.getFullYear();
-      // Find last year same week
       let lyVal = null;
       for (const d of series) {
         const dyr = parseInt(d.date.substring(0, 4));
@@ -3186,7 +3533,6 @@ const APP = window.__app = {
       badge.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
       badge.className = 'fc-badge ' + (ch >= 0 ? 'up' : 'down');
 
-      // Adjusted ensemble value
       const adjEl = document.getElementById(`fc${h + 1}-adj`);
       if (adjFcCards && adjFcCards[h] !== v) {
         adjEl.textContent = `(${adjFcCards[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
@@ -3197,7 +3543,6 @@ const APP = window.__app = {
 
       document.getElementById(`fc${h + 1}-rng`).textContent = `80% CI: ${fmtVal(v + fc.ciLow[h])} — ${fmtVal(v + fc.ciHigh[h])}`;
 
-      // YoY comparison
       const yoyEl = document.getElementById(`fc${h + 1}-yoy`);
       if (yoyData[h] != null && yoyData[h] !== 0) {
         const yoyChg = ((v - yoyData[h]) / yoyData[h] * 100).toFixed(1);
@@ -3221,7 +3566,6 @@ const APP = window.__app = {
     document.getElementById('m-sdcount').textContent = fc.sdFeatureCount + ' / 8';
     document.getElementById('m-active').textContent = fc.activeCount + (fc.needFallback ? ' (+fallbacks)' : '');
 
-    // Quality indicators
     const mapeVal = parseFloat(fc.metrics.mape);
     if (!isNaN(mapeVal)) {
       document.getElementById('mi-mape').dataset.quality = mapeVal < 2 ? 'good' : mapeVal < 5 ? 'ok' : 'poor';
@@ -3253,31 +3597,6 @@ const APP = window.__app = {
     }
     dt.innerHTML = dr;
 
-    // PADD table
-    const pt = document.getElementById('padd-tbody');
-    let pr = '';
-    for (const p of PADDS) {
-      const s = extractSeries(api, p);
-      if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
-      const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
-      let f1 = lt, f4 = lt;
-      try { const f = runEnsemble(s, {}, 4); f1 = f.ensemble[0]; f4 = f.ensemble[3]; } catch(e) {}
-      const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
-      let a5 = 0, c5 = 0;
-      for (const d of s) {
-        const dy = parseInt(d.date.substring(0, 4));
-        if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; }
-      }
-      a5 = c5 > 0 ? a5 / c5 : lt;
-      const v5 = lt - a5;
-      pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
-        <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
-        <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
-        <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
-    }
-    pt.innerHTML = pr;
-
-    // Charts
     this.currentSeries = series;
     this.currentFc = fc;
     renderMainChart(series, fc);
@@ -3286,8 +3605,43 @@ const APP = window.__app = {
     updateAdjCompare();
     updateAdjPresetButtons();
 
-    log('Forecast complete', 'ok');
+    journalScoreEntries(series);
+    renderJournalUI();
+
     setStatus('ready', 'READY');
+
+    // Deferred: cross-PADD snapshot (non-blocking)
+    if (api) {
+      setTimeout(() => {
+        const pt = document.getElementById('padd-tbody');
+        let pr = '';
+        for (const p of PADDS) {
+          const s = extractSeries(api, p);
+          if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
+          const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
+          let f1 = lt, f4 = lt;
+          try {
+            const paddDates = s.map(d => d.date);
+            const paddSdF = buildSDFeatures(p, paddDates, s);
+            const f = runEnsembleLite(s, paddSdF, 4);
+            f1 = f.ensemble[0]; f4 = f.ensemble[3];
+          } catch(e) {}
+          const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
+          let a5 = 0, c5 = 0;
+          for (const d of s) {
+            const dy = parseInt(d.date.substring(0, 4));
+            if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; }
+          }
+          a5 = c5 > 0 ? a5 / c5 : lt;
+          const v5 = lt - a5;
+          pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
+            <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
+            <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
+            <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
+        }
+        pt.innerHTML = pr;
+      }, 50);
+    }
   }
 };
 
@@ -3303,21 +3657,14 @@ function runBacktest(series, horizon, windowSize, sdF) {
     const sub = series.slice(0, t + 1);
     if (sub.length < SEASON * 2) continue;
 
-    // Slice S&D features to match
     const sdSub = {};
     for (const k of Object.keys(sdF || {})) {
       if (sdF[k]) sdSub[k] = sdF[k].slice(0, t + 1);
     }
 
     try {
-      const m1 = sdRegression(sub, sdSub, horizon);
-      const m2 = sdBalanceModel(sub, sdSub, horizon);
-      const m3 = arModel(sub, horizon);
-      const models = [m1, m2, m3];
-
-      let cnt = 0, sum = 0;
-      for (const m of models) { if (m) { sum += m[horizon - 1]; cnt++; } }
-      const ensPred = cnt > 0 ? sum / cnt : sub[sub.length - 1].value;
+      const fc = runEnsembleLite(sub, sdSub, horizon);
+      const ensPred = fc.ensemble[horizon - 1];
 
       const actual = series[t + horizon].value;
       const predDate = series[t + horizon].date;
@@ -3330,9 +3677,9 @@ function runBacktest(series, horizon, windowSize, sdF) {
         fromDate,
         actual,
         ensemble: ensPred,
-        sd: m1 ? m1[horizon - 1] : null,
-        sdbal: m2 ? m2[horizon - 1] : null,
-        ar: m3 ? m3[horizon - 1] : null,
+        sd: fc.sdRegRaw ? fc.sdRegRaw[horizon - 1] : null,
+        sdbal: fc.sdBalanceRaw ? fc.sdBalanceRaw[horizon - 1] : null,
+        ar: fc.arModelRaw ? fc.arModelRaw[horizon - 1] : null,
         error: ensPred - actual,
         absError: Math.abs(ensPred - actual),
         pctError: Math.abs(actual) > 0 ? Math.abs(ensPred - actual) / Math.abs(actual) * 100 : 0,

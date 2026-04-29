@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gasoline Stock Prediction Engine v5</title>
+<title>Total Gasoline Stocks Model</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -187,6 +187,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 #adj-compare th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
 #adj-compare td{font-size:.78rem}
 .adj-positive{color:var(--accent-green)}.adj-negative{color:var(--accent-red)}
+
 /* ─── Help Modal ─── */
 #help-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #help-modal-overlay.open{display:flex}
@@ -254,18 +255,13 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 <body>
 <div class="grain"></div>
 <div id="loading-overlay">
-  <div class="loader-title">GASOLINE STOCK PREDICTION ENGINE</div>
+  <div class="loader-title">TOTAL GASOLINE STOCKS MODEL</div>
   <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-fill"></div></div>
   <div class="loader-status" id="loader-status">Initializing...</div>
 </div>
 <header>
-  <div class="logo">GASOLINE PREDICT <span>v5.0</span></div>
+  <div class="logo">TOTAL GAS MODEL <span>v6.0</span></div>
   <div class="controls">
-    <select id="sel-product">
-      <option value="totalMotorGas">Total Motor Gasoline</option>
-      <option value="rbob">RBOB (Reformulated Blendstock)</option>
-      <option value="cbob">CBOB (Conventional Blendstock)</option>
-    </select>
     <select id="sel-padd">
       <option value="NUS">U.S. Total</option>
       <option value="R10">PADD 1 — East Coast</option>
@@ -617,8 +613,8 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
           <div class="adj-field">
             <label class="adj-label">Direction</label>
             <div class="adj-dir-toggle">
-              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish</button>
-              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish</button>
+              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish (Builds)</button>
+              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish (Draws)</button>
             </div>
           </div>
         </div>
@@ -697,6 +693,47 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
       </table>
     </div>
 
+    <!-- Adjustment Journal — Scorecard -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>Adjustment Journal — Performance Tracker</div>
+        <div class="card-actions"><button id="btn-journal-clear">Clear Journal</button></div>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-secondary);margin:0 0 12px;line-height:1.5">
+        Every adjustment is logged with a snapshot of the model forecast. When actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone.
+      </p>
+      <div id="journal-empty" class="adj-empty">No scored journal entries yet. Add adjustments and wait for actual data to arrive for scoring.</div>
+      <div id="journal-scorecard" style="display:none">
+        <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-entries">—</div><div class="metric-label">Scored Entries</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-pct">—</div><div class="metric-label">Adj. Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-model-pct">—</div><div class="metric-label">Model Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-improvement">—</div><div class="metric-label">MAE Improvement</div></div>
+        </div>
+        <div class="metrics-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-model-mae">—</div><div class="metric-label">Avg Model MAE (kbbl)</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-mae">—</div><div class="metric-label">Avg Adjusted MAE (kbbl)</div></div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="journal-table" style="display:none">
+          <thead><tr>
+            <th>Date Logged</th>
+            <th>Event</th>
+            <th>Region</th>
+            <th>Dir.</th>
+            <th>Impact</th>
+            <th>Model +1W</th>
+            <th>Adj. +1W</th>
+            <th>Actual +1W</th>
+            <th>Winner</th>
+            <th>Notes</th>
+          </tr></thead>
+          <tbody id="journal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div><!-- /tab-adjustments -->
 
   <!-- Engine Log (collapsible) -->
@@ -740,24 +777,11 @@ const NUM_MODELS = 5;        // v5: 3 primary + 2 fallback (same slots for compa
 const PADDS = ['NUS','R10','R20','R30','R40','R50'];
 const PL = {NUS:'U.S. Total',R10:'PADD 1 (East Coast)',R20:'PADD 2 (Midwest)',R30:'PADD 3 (Gulf Coast)',R40:'PADD 4 (Rocky Mtn)',R50:'PADD 5 (West Coast)'};
 
-const PRODUCTS = {
-  totalMotorGas: {
-    label: 'Total Motor Gasoline',
-    endpoint: 'stoc',
-    productCode: 'EPM0'
-  },
-  rbob: {
-    label: 'RBOB Blendstock',
-    endpoint: 'sndw',
-    productCode: 'EPOBGRR',
-    processCode: 'SAE'
-  },
-  cbob: {
-    label: 'CBOB Blendstock',
-    endpoint: 'sndw',
-    productCode: 'EPOBGCC',
-    processCode: 'SAE'
-  }
+const PRODUCT_KEY = 'totalMotorGas';
+const PRODUCT_CFG = {
+  label: 'Total Motor Gasoline',
+  endpoint: 'stoc',
+  productCode: 'EPM0'
 };
 
 // S&D data store — keyed like the dashboard: "category_product_area"
@@ -792,7 +816,7 @@ function getAdjPresets(eventType) {
 
   const app = window.__app;
   if (!app || !app.rawData || !app.currentSeries) return base.map(v => Math.round(v * 0.2));
-  const pk = document.getElementById('sel-product').value;
+  const pk = PRODUCT_KEY;
   const nusRaw = app.rawData[pk];
   if (!nusRaw) return base.map(v => Math.round(v * 0.2));
   const nusSeries = extractSeries(nusRaw, 'NUS');
@@ -821,17 +845,134 @@ function getAdjustedForecast(fc) {
 }
 
 function saveAdjustments() {
-  try { localStorage.setItem('gasoline_adj_v5', JSON.stringify(analystAdjustments)); } catch(e) {}
+  try { localStorage.setItem('total_gas_adj_v6', JSON.stringify(analystAdjustments)); } catch(e) {}
 }
 
 function loadAdjustments() {
   try {
-    const raw = localStorage.getItem('gasoline_adj_v5');
+    const raw = localStorage.getItem('total_gas_adj_v6');
     if (raw) {
       analystAdjustments = JSON.parse(raw);
       adjIdCounter = analystAdjustments.reduce((mx, a) => Math.max(mx, a.id || 0), 0) + 1;
     }
   } catch(e) { analystAdjustments = []; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADJUSTMENT JOURNAL — tracks adjustment accuracy over time
+// ═══════════════════════════════════════════════════════════
+const JOURNAL_KEY = 'total_gas_journal_v6';
+let adjustmentJournal = [];
+
+function loadJournal() {
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY);
+    if (raw) adjustmentJournal = JSON.parse(raw);
+  } catch(e) { adjustmentJournal = []; }
+}
+
+function saveJournal() {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(adjustmentJournal)); } catch(e) {}
+}
+
+// Called when user adds an adjustment — snapshot the current model state
+function journalLogAdjustment(adj, modelForecast, padd) {
+  const app = window.__app;
+  if (!app || !app.currentSeries || !modelForecast) return;
+  const lastDate = app.currentSeries[app.currentSeries.length - 1].date;
+  const ld = new Date(lastDate);
+  const forecastDates = Array.from({length: FC_WEEKS}, (_, h) => {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    return d.toISOString().split('T')[0];
+  });
+
+  const entry = {
+    id: Date.now(),
+    createdAt: new Date().toISOString(),
+    adjType: adj.type,
+    direction: adj.direction,
+    impact: adj.impact,
+    weeks: adj.weeks,
+    notes: adj.notes,
+    padd: padd,
+    dataAsOf: lastDate,
+    forecastDates: forecastDates,
+    modelEnsemble: modelForecast.ensemble.slice(),
+    adjustedEnsemble: modelForecast.ensemble.map((v, h) => v + (adj.weeks[h] ? adj.direction * adj.impact : 0)),
+    actuals: [null, null, null, null],
+    scored: false
+  };
+  adjustmentJournal.push(entry);
+  saveJournal();
+}
+
+// Called whenever new data loads — check if any journal entries can be scored
+function journalScoreEntries(series) {
+  if (!series || series.length === 0) return;
+  const dateMap = {};
+  series.forEach(d => dateMap[d.date] = d.value);
+
+  let updated = false;
+  for (const entry of adjustmentJournal) {
+    if (entry.scored) continue;
+    let allScored = true;
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] != null) continue;
+      const actual = dateMap[entry.forecastDates[h]];
+      if (actual != null) {
+        entry.actuals[h] = actual;
+        updated = true;
+      } else {
+        allScored = false;
+      }
+    }
+    // Mark as scored if at least week 1 has actual data
+    if (entry.actuals[0] != null) {
+      entry.scored = true;
+      updated = true;
+    }
+  }
+  if (updated) saveJournal();
+}
+
+// Calculate journal performance stats
+function getJournalStats() {
+  const scored = adjustmentJournal.filter(e => e.scored && e.actuals[0] != null);
+  if (scored.length === 0) return null;
+
+  let modelBetter = 0, adjBetter = 0, tie = 0;
+  let totalModelErr = 0, totalAdjErr = 0;
+  let byType = {};
+
+  for (const entry of scored) {
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] == null) continue;
+      const modelErr = Math.abs(entry.modelEnsemble[h] - entry.actuals[h]);
+      const adjErr = Math.abs(entry.adjustedEnsemble[h] - entry.actuals[h]);
+      totalModelErr += modelErr;
+      totalAdjErr += adjErr;
+      if (adjErr < modelErr) adjBetter++;
+      else if (modelErr < adjErr) modelBetter++;
+      else tie++;
+
+      if (!byType[entry.adjType]) byType[entry.adjType] = {modelErr: 0, adjErr: 0, count: 0};
+      byType[entry.adjType].modelErr += modelErr;
+      byType[entry.adjType].adjErr += adjErr;
+      byType[entry.adjType].count++;
+    }
+  }
+
+  const totalComparisons = modelBetter + adjBetter + tie;
+  return {
+    totalEntries: scored.length,
+    totalComparisons,
+    adjBetterPct: totalComparisons > 0 ? (adjBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    modelBetterPct: totalComparisons > 0 ? (modelBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    avgModelMAE: totalComparisons > 0 ? (totalModelErr / totalComparisons) : 0,
+    avgAdjMAE: totalComparisons > 0 ? (totalAdjErr / totalComparisons) : 0,
+    improvement: totalModelErr > 0 ? ((totalModelErr - totalAdjErr) / totalModelErr * 100).toFixed(1) : '0.0',
+    byType
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1115,7 +1256,7 @@ function estimatePaddDemand(padd, stockDates, paddSeries) {
   // We need the NUS stock data — pull from the app's rawData via extractSeries
   const app = window.__app;
   if (!app || !app.rawData) return null;
-  const productKey = document.getElementById('sel-product').value;
+  const productKey = PRODUCT_KEY;
   const nusRaw = app.rawData[productKey];
   if (!nusRaw) return null;
   const nusSeries = extractSeries(nusRaw, 'NUS');
@@ -1655,7 +1796,7 @@ function ols(X, y, ridge) {
 const WEIGHT_CACHE = new Map();
 function weightCacheKey(series) {
   // Cache key = product + region + last date + length
-  const pk = document.getElementById('sel-product').value;
+  const pk = PRODUCT_KEY;
   const padd = document.getElementById('sel-padd').value;
   return pk + '_' + padd + '_' + series[series.length - 1].date + '_' + series.length;
 }
@@ -2672,6 +2813,94 @@ function refreshChartWithAdjustments() {
   }
 }
 
+function renderJournalUI() {
+  const stats = getJournalStats();
+  const scored = adjustmentJournal.filter(e => e.scored);
+  const empty = document.getElementById('journal-empty');
+  const scorecard = document.getElementById('journal-scorecard');
+  const table = document.getElementById('journal-table');
+  const tbody = document.getElementById('journal-tbody');
+
+  if (!stats || scored.length === 0) {
+    empty.style.display = '';
+    scorecard.style.display = 'none';
+    table.style.display = 'none';
+    // Show pending count if any
+    const pending = adjustmentJournal.filter(e => !e.scored).length;
+    if (pending > 0) {
+      empty.textContent = `${pending} adjustment(s) logged and awaiting actual data for scoring.`;
+    } else {
+      empty.textContent = 'No journal entries yet. Add adjustments and wait for actual data to arrive for scoring.';
+    }
+    return;
+  }
+
+  empty.style.display = 'none';
+  scorecard.style.display = '';
+  table.style.display = '';
+
+  // Scorecard
+  document.getElementById('j-entries').textContent = stats.totalEntries;
+  document.getElementById('j-adj-pct').textContent = stats.adjBetterPct + '%';
+  document.getElementById('j-model-pct').textContent = stats.modelBetterPct + '%';
+  const improv = parseFloat(stats.improvement);
+  document.getElementById('j-improvement').textContent = (improv >= 0 ? '+' : '') + stats.improvement + '%';
+  document.getElementById('j-improvement').style.color = improv >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('j-model-mae').textContent = fmtVal(stats.avgModelMAE);
+  document.getElementById('j-adj-mae').textContent = fmtVal(stats.avgAdjMAE);
+
+  // Quality indicators
+  const adjPctEl = document.getElementById('j-adj-pct');
+  const pctVal = parseFloat(stats.adjBetterPct);
+  adjPctEl.style.color = pctVal >= 55 ? 'var(--accent-green)' : pctVal >= 45 ? 'var(--accent-orange)' : 'var(--accent-red)';
+
+  // Table
+  let html = '';
+  for (const entry of scored) {
+    const modelErr = entry.actuals[0] != null ? Math.abs(entry.modelEnsemble[0] - entry.actuals[0]) : null;
+    const adjErr = entry.actuals[0] != null ? Math.abs(entry.adjustedEnsemble[0] - entry.actuals[0]) : null;
+    let winner = '—', winClass = '';
+    if (modelErr != null && adjErr != null) {
+      if (adjErr < modelErr) { winner = 'Adj.'; winClass = 'adj-positive'; }
+      else if (modelErr < adjErr) { winner = 'Model'; winClass = 'adj-negative'; }
+      else { winner = 'Tie'; }
+    }
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr>
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td>${entry.actuals[0] != null ? fmtVal(entry.actuals[0]) : '<em>pending</em>'}</td>
+      <td class="${winClass}" style="font-weight:600">${winner}</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  // Also show pending entries
+  const pending = adjustmentJournal.filter(e => !e.scored);
+  for (const entry of pending) {
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr style="opacity:.6">
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td><em>awaiting data</em></td>
+      <td>—</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
 // ═══════════════════════════════════════════════════════════
 // CSV EXPORT
 // ═══════════════════════════════════════════════════════════
@@ -2698,7 +2927,7 @@ function exportCSV(series, fc) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `total_gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   log('CSV exported' + (hasAdj ? ' (includes analyst adjustments)' : ''), 'ok');
@@ -2715,22 +2944,17 @@ const APP = window.__app = {
   DATA_TTL: 30 * 60 * 1000, // refresh if data older than 30 minutes
 
   async init() {
-    log('Gasoline Stock Prediction Engine v5.0', 'ok');
+    log('Total Gasoline Stocks Model v6.0', 'ok');
     log('Primary: S&D Regression (feat-selected) + S&D Balance (seasonal) + AR(6)', 'ok');
-    log('v5: Regime detection, meta-learner, cached weights, 52-wk CI window', 'ok');
+    log('v6: Regime detection, meta-learner, adjustment journal, 52-wk CI window', 'ok');
 
     setLoader(10, 'Loading stock data...');
 
-    for (const [key, cfg] of Object.entries(PRODUCTS)) {
+    {
+      const cfg = PRODUCT_CFG;
       log(`Loading ${cfg.label}...`);
-      let url;
-      if (cfg.endpoint === 'stoc') {
-        url = stocUrl(cfg.productCode);
-      } else {
-        url = sndwStockUrl(cfg.productCode, cfg.processCode);
-      }
-      log(`  URL: .../${cfg.endpoint}/... product=${cfg.productCode}${cfg.processCode ? ' process=' + cfg.processCode : ''}`);
-
+      const url = stocUrl(cfg.productCode);
+      log(`  URL: .../stoc/... product=${cfg.productCode}`);
       const r = await tfetch(url);
       const n = r?.response?.data?.length || 0;
       if (n > 0) {
@@ -2741,14 +2965,14 @@ const APP = window.__app = {
           const sample = testSeries.slice(-3).map(d => `${d.date}=${d.value}`).join(', ');
           log(`  Latest: ${sample}`);
         }
-        this.rawData[key] = r;
+        this.rawData[PRODUCT_KEY] = r;
       } else {
         log(`  No data returned`, 'warn');
       }
     }
 
     const loaded = Object.keys(this.rawData).length;
-    log(`Products loaded: ${loaded}/${Object.keys(PRODUCTS).length}`, loaded > 0 ? 'ok' : 'err');
+    log(`Data loaded: ${loaded > 0 ? 'OK' : 'FAILED'}`, loaded > 0 ? 'ok' : 'err');
 
     if (loaded === 0) {
       log('FATAL: No data loaded. Check API key.', 'err');
@@ -2786,7 +3010,7 @@ const APP = window.__app = {
 
     // Event listeners
     document.getElementById('btn-run').addEventListener('click', () => this.runForecast());
-    document.getElementById('sel-product').addEventListener('change', () => this.runForecast());
+    // No product selector — Total Motor Gasoline only
     document.getElementById('sel-padd').addEventListener('change', () => this.runForecast());
 
     document.getElementById('btn-refresh').addEventListener('click', async () => {
@@ -2797,17 +3021,17 @@ const APP = window.__app = {
       this.rawData = {};
       this.currentSeries = null;
       this.currentFc = null;
-      for (const [key, cfg] of Object.entries(PRODUCTS)) {
-        log(`Reloading ${cfg.label}...`);
-        const url = cfg.endpoint === 'stoc' ? stocUrl(cfg.productCode) : sndwStockUrl(cfg.productCode, cfg.processCode);
+      {
+        log(`Reloading ${PRODUCT_CFG.label}...`);
+        const url = stocUrl(PRODUCT_CFG.productCode);
         const r = await tfetch(url);
         const n = r?.response?.data?.length || 0;
         if (n > 0) {
-          this.rawData[key] = r;
+          this.rawData[PRODUCT_KEY] = r;
           const testSeries = extractSeries(r, 'NUS');
-          log(`  OK ${cfg.label}: ${testSeries.length} wks`, 'ok');
+          log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
         } else {
-          log(`  ${cfg.label}: no data`, 'warn');
+          log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
         }
       }
       // Re-fetch S&D data
@@ -2831,17 +3055,12 @@ const APP = window.__app = {
     const helpOverlay = document.getElementById('help-modal-overlay');
     const helpBody = document.getElementById('help-modal-body');
     const HELP_HTML = `
-<h1>Gasoline Stock Predictions v5</h1>
-<p>A single-file, browser-based dashboard for forecasting weekly US gasoline inventory levels using EIA petroleum data. Built for commodity traders and analysts tracking RBOB, CBOB, and total motor gasoline stocks across US PADD regions.</p>
+<h1>Total Gasoline Stocks Model v6</h1>
+<p>A single-file, browser-based dashboard for forecasting weekly US total motor gasoline inventory levels using EIA petroleum data. Focused on total gasoline stocks across US PADD regions with analyst adjustment journaling.</p>
 <hr>
 <h2>Overview</h2>
 <p>This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels <strong>1\u20134 weeks forward</strong>. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.</p>
-<p><strong>Products supported:</strong></p>
-<ul>
-<li>Total Motor Gasoline (EPM0)</li>
-<li>RBOB Gasoline (EPOBGRR)</li>
-<li>CBOB Gasoline (EPOBGCC)</li>
-</ul>
+<p><strong>Product:</strong> Total Motor Gasoline (EPM0)</p>
 <p><strong>Regions supported:</strong></p>
 <ul>
 <li>US Total (NUS)</li>
@@ -3017,8 +3236,10 @@ const APP = window.__app = {
 
     // ─── Analyst Adjustments handlers ───
     loadAdjustments();
+    loadJournal();
     updateAdjPresetButtons();
     renderAdjustmentsTable();
+    renderJournalUI();
 
     document.getElementById('adj-type').addEventListener('change', updateAdjPresetButtons);
     document.getElementById('sel-padd').addEventListener('change', updateAdjPresetButtons);
@@ -3042,21 +3263,26 @@ const APP = window.__app = {
       });
       if (!weeks.some(w => w)) { log('Select at least one week', 'warn'); return; }
 
-      analystAdjustments.push({
+      const newAdj = {
         id: adjIdCounter++,
         type: document.getElementById('adj-type').value,
         direction: parseInt(dir) || 1,
         impact: impact,
         weeks: weeks,
         notes: document.getElementById('adj-notes').value.trim()
-      });
+      };
+      analystAdjustments.push(newAdj);
       saveAdjustments();
+      // Log to journal for future scoring
+      const padd = document.getElementById('sel-padd').value;
+      if (this.currentFc) journalLogAdjustment(newAdj, this.currentFc, padd);
       renderAdjustmentsTable();
       updateAdjCompare();
       refreshChartWithAdjustments();
+      renderJournalUI();
       document.getElementById('adj-impact').value = '';
       document.getElementById('adj-notes').value = '';
-      log(`Adjustment added: ${ADJ_TYPE_LABELS[document.getElementById('adj-type').value]} ${impact.toLocaleString()} kbbl`, 'ok');
+      log(`Adjustment added & logged to journal: ${ADJ_TYPE_LABELS[newAdj.type]} ${impact.toLocaleString()} kbbl`, 'ok');
     });
 
     // Clear all adjustments
@@ -3069,6 +3295,14 @@ const APP = window.__app = {
       updateAdjCompare();
       refreshChartWithAdjustments();
       log('All adjustments cleared', 'ok');
+    });
+
+    document.getElementById('btn-journal-clear').addEventListener('click', () => {
+      if (adjustmentJournal.length === 0) return;
+      adjustmentJournal = [];
+      saveJournal();
+      renderJournalUI();
+      log('Adjustment journal cleared', 'ok');
     });
   },
 
@@ -3110,17 +3344,17 @@ const APP = window.__app = {
     this.rawData = {};
     this.currentSeries = null;
     this.currentFc = null;
-    for (const [key, cfg] of Object.entries(PRODUCTS)) {
-      log(`Reloading ${cfg.label}...`);
-      const url = cfg.endpoint === 'stoc' ? stocUrl(cfg.productCode) : sndwStockUrl(cfg.productCode, cfg.processCode);
+    {
+      log(`Reloading ${PRODUCT_CFG.label}...`);
+      const url = stocUrl(PRODUCT_CFG.productCode);
       const r = await tfetch(url);
       const n = r?.response?.data?.length || 0;
       if (n > 0) {
-        this.rawData[key] = r;
+        this.rawData[PRODUCT_KEY] = r;
         const testSeries = extractSeries(r, 'NUS');
-        log(`  OK ${cfg.label}: ${testSeries.length} wks`, 'ok');
+        log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
       } else {
-        log(`  ${cfg.label}: no data`, 'warn');
+        log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
       }
     }
     log('Reloading S&D data...', 'ok');
@@ -3132,10 +3366,10 @@ const APP = window.__app = {
 
   async runForecast() {
     await this.refreshIfStale();
-    const pk = document.getElementById('sel-product').value;
+    const pk = PRODUCT_KEY;
     const padd = document.getElementById('sel-padd').value;
     setStatus('loading', 'FORECASTING...');
-    log(`--- ${PRODUCTS[pk].label} / ${PL[padd]} ---`);
+    log(`--- ${PRODUCT_CFG.label} / ${PL[padd]} ---`);
 
     const api = this.rawData[pk];
     if (!api) { log('No data for this product', 'err'); setStatus('error', 'NO DATA'); return; }
@@ -3285,6 +3519,10 @@ const APP = window.__app = {
     updateMetaLearnerTab(fc);
     updateAdjCompare();
     updateAdjPresetButtons();
+
+    // Score journal entries against new actuals
+    journalScoreEntries(series);
+    renderJournalUI();
 
     log('Forecast complete', 'ok');
     setStatus('ready', 'READY');
