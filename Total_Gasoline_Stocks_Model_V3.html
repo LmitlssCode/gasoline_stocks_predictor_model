@@ -255,7 +255,7 @@ td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
 <body>
 <div class="grain"></div>
 <div id="loading-overlay">
-  <div class="loader-title">TOTAL GASOLINE STOCKS MODEL V2</div>
+  <div class="loader-title">TOTAL GASOLINE MODEL</div>
   <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-fill"></div></div>
   <div class="loader-status" id="loader-status">Initializing...</div>
 </div>
@@ -1930,7 +1930,7 @@ function runEnsemble(series, sdF, horizon, quiet) {
   if (!quiet) {
     const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
     log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
-    log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+    log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModels.some(m => m) ? ' [meta-learner active]' : ''}`);
   }
 
   const fc = [];
@@ -2180,19 +2180,19 @@ function runEnsembleLite(series, sdF, horizon) {
   const m5 = needFallback ? holtWinters(series, horizon) : null;
   const models = [m1, m2, m3, m4, m5];
 
-  // Use cached meta-learner + weights if available, otherwise use defaults
+  // Use cached per-horizon meta-learners + weights if available
   const cacheKey = weightCacheKey(series);
-  const metaModel = WEIGHT_CACHE.get(cacheKey + '_meta') || null;
   const w = WEIGHT_CACHE.get(cacheKey + '_weights') ||
             (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
 
   const fc = [];
   for (let h = 0; h < horizon; h++) {
     let val = null;
-    if (metaModel && metaModel.mean && m1 && m2 && m3) {
+    const hMeta = WEIGHT_CACHE.get(cacheKey + '_meta_h' + (h + 1)) || null;
+    if (hMeta && hMeta.mean && m1 && m2 && m3) {
       const rf = regimeFeatures(regime);
       const metaFeatures = [m1[h], m2[h], m3[h], ...rf];
-      val = applyMetaLearner(metaModel, metaFeatures);
+      val = applyMetaLearner(hMeta, metaFeatures);
       const modelOutputs = [m1[h], m2[h], m3[h]];
       const mn = Math.min(...modelOutputs), mx = Math.max(...modelOutputs);
       const range = mx - mn;
