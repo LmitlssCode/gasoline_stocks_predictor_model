@@ -2037,11 +2037,9 @@ function calcCI(series, sdF) {
         mae += e;
         if (Math.abs(act) > 0) mape += (e / Math.abs(act)) * 100;
         mCnt++;
-        if (w > 1) {
-          const prevAct = series[n - metricWindow + w - 2].value;
-          if ((fc[0] > sub[sub.length - 1].value) === (act > prevAct)) dOk++;
-          dN++;
-        }
+        const lastKnown = sub[sub.length - 1].value;
+        if ((fc[0] >= lastKnown) === (act >= lastKnown)) dOk++;
+        dN++;
       }
     } catch(e) { /* skip */ }
   }
@@ -3715,7 +3713,6 @@ function runBacktest(series, horizon, windowSize, sdF) {
       const actual = series[t + horizon].value;
       const predDate = series[t + horizon].date;
       const fromDate = series[t].date;
-      const prevActual = series[t + horizon - 1].value;
       const lastKnown = sub[sub.length - 1].value;
 
       results.push({
@@ -3729,7 +3726,7 @@ function runBacktest(series, horizon, windowSize, sdF) {
         error: ensPred - actual,
         absError: Math.abs(ensPred - actual),
         pctError: Math.abs(actual) > 0 ? Math.abs(ensPred - actual) / Math.abs(actual) * 100 : 0,
-        dirCorrect: (ensPred > lastKnown) === (actual > prevActual)
+        dirCorrect: (ensPred >= lastKnown) === (actual >= lastKnown)
       });
     } catch(e) { /* skip */ }
   }
