@@ -1,143 +1,157 @@
-# Gasoline Stock Predictions v5
+# Total Gasoline Stocks Model v6.2
 
-A single-file, browser-based dashboard for forecasting weekly US gasoline inventory levels using EIA petroleum data. Built for commodity traders and analysts tracking RBOB, CBOB, and total motor gasoline stocks across US PADD regions.
+A single-file, browser-based dashboard for forecasting weekly US **Total Motor Gasoline** inventory levels using live EIA petroleum data. Covers US Total and all five PADD regions with analyst adjustment journaling and forward-tracking accuracy scoring.
 
 ---
 
 ## Overview
 
-This tool fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast model to predict gasoline stock levels 1–4 weeks forward. The ensemble combines three fundamental models under a meta-learner that adapts its blending weights based on the current market regime.
+This model fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast to predict gasoline stock levels **1–4 weeks forward**. Three fundamental models feed into a meta-learner that adapts its blending weights based on the current market regime.
 
-**Products supported:**
-- Total Motor Gasoline (EPM0)
-- RBOB Gasoline (EPOBGRR)
-- CBOB Gasoline (EPOBGCC)
+**Product:** Total Motor Gasoline (EIA code: EPM0)
 
-**Regions supported:**
-- US Total (NUS)
-- PADD 1 (East Coast)
-- PADD 2 (Midwest)
-- PADD 3 (Gulf Coast)
-- PADD 4 (Rocky Mountain)
-- PADD 5 (West Coast)
+**Regions:**
+- U.S. Total (NUS)
+- PADD 1 — East Coast
+- PADD 2 — Midwest
+- PADD 3 — Gulf Coast
+- PADD 4 — Rocky Mountain
+- PADD 5 — West Coast
 
 ---
 
-## How It Works
+## Data Inputs
 
-### Data Inputs
-
-All data is pulled from the EIA API v2 (`api.eia.gov/v2/petroleum/`):
+All data is pulled live from the `EIA API v2`:
 
 | Series | Description |
 |--------|-------------|
-| Weekly stocks | Primary target variable (kbbl) |
-| Production | Domestic refinery output |
-| Imports / Exports | Trade flows |
-| Refinery utilization | Capacity utilization rate |
-| Demand (product supplied) | Implied consumption |
+| Weekly Stocks | Primary target variable (kbbl) |
+| Production | Finished gasoline output from refineries |
+| Imports / Exports | Trade flows (gasoline, RBOB, CBOB) |
+| Refinery Utilization | Capacity utilization rate (%) |
+| Crude Inputs | Crude oil input to refineries |
+| Blender Inputs | RBOB and CBOB blender net inputs |
+| Demand (Product Supplied) | Implied weekly consumption (US-total only; PADD demand estimated via stock-share proportioning) |
 
-Data is cached in memory with a 30-minute TTL and auto-refreshes when you click **Run Forecast**.
-
----
-
-### Prediction Models
-
-Three primary models form the base layer of the ensemble:
-
-#### 1. S&D Regression
-A ridge regression (λ = 1.0) trained on supply-and-demand features. Uses forward stepwise feature selection to choose the most predictive subset from ~10 candidate features: lagged production, import delta, export delta, refinery utilization change, demand delta, and their recent trends. When fewer than 52 weeks of data are available, falls back to a simpler OLS on available data.
-
-#### 2. S&D Balance
-A seasonally-aware projection model. Computes the implied weekly stock change from net supply minus demand, then anchors the forecast to same-week-last-year stock levels, blending recent build/draw trajectory with seasonal norms. This model is particularly useful during large seasonal turning points.
-
-#### 3. AR(6) Autoregressive Model
-An autoregressive model using the prior 6 weeks of stock levels. Captures momentum and mean reversion. Acts as a pure time-series baseline and serves as the fallback when S&D data is sparse.
-
-**Fallback models** (used when S&D data is unavailable):
-- **Seasonal Naive**: Projects same-week-last-year stock level forward
-- **Holt-Winters**: Exponential smoothing with trend and seasonality components
+Data is cached in-memory with a **30-minute TTL** and auto-refreshes when stale. Up to **8 S&D feature series** are loaded per region.
 
 ---
 
-### Regime Detection
+## Prediction Models
 
-Before blending, the model detects the current market regime using five signals:
+Three primary models form the base layer:
+
+### 1. S&D Regression
+Ridge regression (λ = 1.0) with **forward stepwise feature selection**. Starts with core features (seasonality harmonics, momentum, YoY change) and greedily adds S&D features only if they improve out-of-sample validation accuracy. Prevents overfitting to noisy inputs.
+
+### 2. S&D Balance
+Seasonally-aware flow model. Computes implied weekly stock change from Production + Imports – Exports – Demand, calibrated against actual stock changes over the last 26 weeks. Projects forward using **same-week-last-year** component values adjusted by current deviation from seasonal norms.
+
+### 3. AR(6) Autoregressive
+Pure time-series model using lags 1–6 plus a seasonal lag (week 52). Captures momentum and mean reversion. Acts as the baseline when S&D data is sparse.
+
+**Fallback models** (activated only when S&D data is insufficient):
+- **Seasonal Naive** — Weighted multi-year same-week average with trend adjustment
+- **Holt-Winters** — Exponential smoothing with grid-searched α, β, γ parameters
+
+---
+
+## Regime Detection
+
+Before blending, the model classifies the current market environment using 7 features:
 
 | Feature | Description |
 |---------|-------------|
-| Season | Categorical: build (Oct–Mar), draw (Apr–Sep), peak (Jul–Aug), shoulder (Sep/Apr) |
-| Volatility ratio | 8-week vs. 52-week realized stock volatility |
-| Turnaround flag | Binary: refinery utilization dropped >3 pts over 4 weeks |
-| Momentum | Direction and magnitude of recent 4-week stock change |
-| Season × Volatility | Interaction term |
-
-These seven regime features are passed to the meta-learner as additional inputs alongside the three base model predictions.
+| Season (4 one-hot) | **Draw** (wk 10–24), **Peak** (wk 25–36), **Build** (wk 37–46), **Shoulder** (wk 47–9) |
+| Volatility ratio | Recent 8-week vol ÷ trailing 52-week vol (>1.5× = high volatility) |
+| Turnaround flag | Refinery utilization dropped >3 pts in 4 weeks |
+| Momentum | 4-week stock change acceleration/deceleration (kbbl) |
 
 ---
 
-### Meta-Learner (Ensemble Model)
+## Meta-Learner (Ensemble Blending)
 
-The meta-learner is a ridge regression (λ = 0.5) trained on a rolling 30-week backtest. It learns 10 coefficients:
+A ridge regression (λ = 0.5) trained on 30-week rolling backtest data. Learns **10 coefficients**:
 
-- **1 intercept**
-- **3 model blend weights** — how much to trust S&D Regression, S&D Balance, and AR(6) respectively
-- **7 regime bias adjustments** — how each regime feature should shift the final prediction up or down
+- 1 intercept
+- 3 model blend weights — how much to trust each base model
+- 7 regime bias adjustments — regime-conditional corrections in kbbl
 
-Each week, the meta-learner combines all three base model predictions with the current regime features to produce the final **Ensemble** forecast. It automatically adapts over time as new weekly data is added — no manual tuning is needed across seasons.
-
-When fewer than 30 backtest samples exist (e.g., sparse PADD/product combinations), the meta-learner falls back to an **inverse-MAE weighted average** with exponential decay, giving more recent forecasts higher weight.
+A **sanity check** bounds the meta-learner output to ±50% of the model spread. If it extrapolates too far, the system falls back to inverse-MAE weighted averaging with exponential decay (most recent weeks weighted highest).
 
 ---
 
-### Confidence Intervals
+## Confidence Intervals
 
-80% confidence intervals are computed from a 52-week rolling backtest window. For each historical week in that window, the model generates an out-of-sample forecast and measures the residual. The 10th and 90th percentile of those residuals define the CI band, scaled forward by forecast horizon.
+80% CIs are computed from a **52-week** rolling backtest window. The 10th and 90th percentile of historical ensemble residuals define the band at each forecast horizon. Falls back to scaled standard deviation when backtest sample is too small.
 
 ---
 
-## Dashboard Features
+## Dashboard Tabs
 
-### Main Forecast Tab
-- Interactive Chart.js time series with 5-year seasonal average band
-- Historical stocks, ensemble forecast, and 80% CI shading
-- Hover tooltips — the last historical point shows only the actual stock value; model values only appear on forecast dates
-- Forecast table: Ensemble, S&D Reg, S&D Balance, AR Model, CI bounds, week-over-week change (all in kbbl)
-- CSV export of full forecast table
-- Scatter plot: Predicted vs. Actual for backtest window
+### Forecast Tab
+- **Forecast cards**: +1W through +4W predictions with % change badges, 80% CI ranges, and YoY comparisons
+- **Interactive chart**: Historical stocks, ensemble line, individual model lines, adjusted ensemble (when active), and optional 5-year avg band
+- **Cross-PADD Snapshot**: All 6 regions' latest stocks, weekly change, +1W and +4W forecasts (computed with full S&D features for each PADD), and position vs. 5-year average
+- **Detailed forecast table**: All model outputs, CI bounds, with adjusted column when adjustments are active
+- **CSV export**: Full forecast including adjusted values if applicable
+
+### Backtest Tab
+- **Rolling backtest**: Runs the full ensemble (including meta-learner and regime detection) at each historical point
+- **Summary stats**: MAPE, MAE, directional accuracy, sample count
+- **Per-model MAE comparison**: Visual bars comparing Ensemble vs. S&D Reg vs. S&D Balance vs. AR
+- **Scatter plot**: Predicted vs. Actual with perfect-line reference
+- Configurable horizon (+1W to +4W) and window (26, 52, or 104 weeks)
 
 ### Meta-Learner Tab
-Provides transparency into how the ensemble is making decisions:
-- **Summary stats**: R², MAPE, directional accuracy from 30-week backtest
-- **Current regime**: Active regime features and their values
-- **Feature vector**: Full 10-feature input into the meta-learner for the current forecast
-- **Model blend weights chart**: Coefficients for S&D Reg, S&D Balance, AR(6)
-- **Regime bias chart**: All 7 regime coefficients, with active features highlighted
-- **Blending walkthrough**: Step-by-step table showing how each component contributes to the final prediction
-- **Fallback weights**: Inverse-MAE weights used when meta-learner has insufficient training data
+- **Current regime**: Season, volatility, turnaround, momentum
+- **Regime feature vector**: All 7 features the meta-learner sees
+- **Model blend weights chart**: Bar chart of the 3 base model coefficients
+- **Regime bias chart**: All 7 regime coefficients with active features highlighted
+- **Blending walkthrough**: Step-by-step table showing intercept + model contributions + regime biases = final output
+- **Fallback weights**: Inverse-MAE weights used when meta-learner is inactive
+
+### Analyst Adjustments Tab
+- **Adjustment builder**: Add qualitative overlays (refinery outage, weather event, demand shock, etc.) with direction (Bullish/Bearish), magnitude in kbbl, and affected weeks
+- **Smart presets**: Impact suggestions auto-scaled by region's share of national stocks
+- **Active adjustments table**: Shows all current adjustments with net impact per forecast week
+- **Adjusted vs. Model comparison**: Side-by-side table of model ensemble vs. adjusted forecast
+- **Adjustment Journal**: Forward-tracking performance scorer. When you add an adjustment, it snapshots the model forecast. As actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone. Tracks win rate, MAE improvement, and per-entry detail.
 
 ---
 
 ## Usage
 
-1. Open `gasoline_stock_predictions_v5.html` in any modern browser
-2. Enter your EIA API key (free at [eia.gov/opendata](https://www.eia.gov/opendata/))
-3. Select product and PADD region
-4. Click **Run Forecast** — data loads and the model runs automatically
-5. Adjust forecast horizon (1–4 weeks) as needed
-6. Use the **Meta-Learner** tab to inspect model internals
-7. Export forecast to CSV if needed
+1. Open `Total_Gasoline_Stocks_Model_V2.html` in any modern browser (no install or server required)
+2. Select a PADD region from the dropdown (defaults to U.S. Total)
+3. Click **▶ Run Forecast** to generate the ensemble prediction
+4. Explore individual model contributions in the chart legend
+5. Run a **Backtest** to validate model accuracy over the last 26–104 weeks
+6. Use the **Meta-Learner** tab to understand how models are being blended
+7. Add **Analyst Adjustments** to overlay qualitative views on the forecast
+8. Track your adjustment accuracy over time in the **Adjustment Journal**
+9. Export forecasts to CSV with the ↓ button
 
-> **Note on performance by region/product:** Forecast accuracy is highest for US Total Motor Gasoline due to the volume of EIA data available. Individual PADD regions and sub-products (RBOB, CBOB) show higher MAPE and lower directional accuracy because stock levels are smaller in absolute terms (amplifying percentage errors), EIA S&D coverage is less complete, and the signals are choppier with more data revisions.
+> **PADD accuracy note:** Forecast accuracy is highest for U.S. Total due to the volume of EIA data available. Individual PADD regions show higher MAPE because stock levels are smaller and S&D data is sparser. PADD-level demand is estimated via stock-share proportioning of national product supplied data.
+
+---
+
+## V2 Changes
+
+- **Cross-PADD Snapshot** now runs the full ensemble with real S&D features for each PADD, matching Forecast tab calculations exactly
+- **Backtest engine** now uses the complete `runEnsemble()` pipeline (meta-learner + regime detection + inverse-MAE weighting) instead of a simple model average
+- **Forecast metrics** (MAPE, MAE, direction accuracy) now use S&D features during their backtest validation, consistent with the live forecast
+- All tabs share the same ensemble computation path — no divergence between what the Forecast tab shows and what Backtest or Cross-PADD reports
 
 ---
 
 ## Technical Notes
 
-- **No build tools required.** All dependencies load from CDN (Chart.js, Papa Parse).
+- **No build tools required.** Single HTML file with CDN dependencies (Chart.js 4.4.4).
 - **No backend.** All computation runs client-side in the browser.
-- **Weight cache** is keyed by `product_PADD_lastDate_seriesLength` to prevent cross-product/region collisions.
-- Data units throughout are **Thousand Barrels (kbbl)**, consistent with EIA reporting.
+- **Data units:** Thousand Barrels (kbbl) throughout, consistent with EIA reporting.
+- **Persistence:** Analyst adjustments and journal entries are stored in `localStorage`.
 
 ---
 
@@ -145,9 +159,9 @@ Provides transparency into how the ensemble is making decisions:
 
 ```
 gasoline_stock_predictions/
-├── gasoline_stock_predictions_v5.html       # Full dashboard (RBOB, CBOB, Total Gas)
+├── Total_Gasoline_Stocks_Model_V2.html      # Total Gas focused model v6.2 (latest)
 ├── Total_Gasoline_Stocks_Model.html         # Total Gas focused model v6.0
-├── Total_Gasoline_Stocks_Model_V2.html      # Total Gas focused model v6.2 (consistency fixes)
+├── gasoline_stock_predictions_v5.html       # Full dashboard (RBOB, CBOB, Total Gas)
 ├── gasoline_stock_predictions_v4.html       # Prior version
 ├── gasoline_stock_predictions_v3.html       # Prior version
 └── .claude/
@@ -172,5 +186,5 @@ gasoline_stock_predictions/
 
 ## Data Source
 
-All data sourced from the **US Energy Information Administration (EIA) API v2**.  
+All data sourced from the **US Energy Information Administration (EIA) API v2**.
 API documentation: [https://www.eia.gov/opendata/documentation.php](https://www.eia.gov/opendata/documentation.php)
