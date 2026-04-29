@@ -3695,22 +3695,47 @@ const APP = window.__app = {
 
     setStatus('ready', 'READY');
 
-    // Deferred: cross-PADD snapshot (non-blocking)
+    // Deferred: cross-PADD snapshot with proportional anchoring (non-blocking)
     if (api) {
       setTimeout(() => {
         const pt = document.getElementById('padd-tbody');
-        let pr = '';
+
+        // First pass: compute raw forecasts for all PADDs
+        const paddForecasts = {};
         for (const p of PADDS) {
           const s = extractSeries(api, p);
-          if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
-          const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
-          let f1 = lt, f4 = lt;
+          if (s.length < 52) { paddForecasts[p] = null; continue; }
           try {
             const paddDates = s.map(d => d.date);
             const paddSdF = buildSDFeatures(p, paddDates, s);
             const f = runEnsembleLite(s, paddSdF, 4);
-            f1 = f.ensemble[0]; f4 = f.ensemble[3];
-          } catch(e) {}
+            paddForecasts[p] = { series: s, fc: f.ensemble };
+          } catch(e) { paddForecasts[p] = null; }
+        }
+
+        // Anchor: scale R10-R50 so they sum to NUS forecast at each horizon
+        const nus = paddForecasts['NUS'];
+        const regionPadds = ['R10', 'R20', 'R30', 'R40', 'R50'];
+        if (nus && regionPadds.every(p => paddForecasts[p])) {
+          for (let h = 0; h < 4; h++) {
+            const nusTarget = nus.fc[h];
+            let regionSum = 0;
+            for (const p of regionPadds) regionSum += paddForecasts[p].fc[h];
+            if (regionSum > 0 && Math.abs(regionSum - nusTarget) / nusTarget > 0.001) {
+              const scale = nusTarget / regionSum;
+              for (const p of regionPadds) paddForecasts[p].fc[h] *= scale;
+            }
+          }
+        }
+
+        // Render table
+        let pr = '';
+        for (const p of PADDS) {
+          const pf = paddForecasts[p];
+          if (!pf) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
+          const s = pf.series;
+          const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
+          const f1 = pf.fc[0], f4 = pf.fc[3];
           const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
           let a5 = 0, c5 = 0;
           for (const d of s) {
