@@ -17,8 +17,8 @@
   --border: #21262d;
   --border-accent: #30363d;
   --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #8b949e;
+  --text-secondary: #b0b8c1;
+  --text-muted: #b0b8c1;
   --accent-blue: #58a6ff;
   --accent-green: #3fb950;
   --accent-red: #f85149;
@@ -2205,7 +2205,7 @@ Chart.register(crosshairPlugin);
 const tooltipStyle = {
   backgroundColor: 'rgba(13,17,23,0.95)',
   titleColor: '#e6edf3',
-  bodyColor: '#8b949e',
+  bodyColor: '#b0b8c1',
   titleFont: {family: 'JetBrains Mono', size: 12, weight: '600'},
   bodyFont: {family: 'JetBrains Mono', size: 11},
   borderColor: '#30363d',
@@ -2338,7 +2338,7 @@ function renderMainChart(series, fc) {
       responsive: true, maintainAspectRatio: false,
       interaction: {mode: 'nearest', axis: 'x', intersect: false},
       plugins: {
-        legend: {labels: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16, filter: i => !hiddenLabels.has(i.text)}},
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16, filter: i => !hiddenLabels.has(i.text)}},
         tooltip: {
           ...tooltipStyle,
           mode: 'nearest', axis: 'x', intersect: false,
@@ -2359,8 +2359,8 @@ function renderMainChart(series, fc) {
         }
       },
       scales: {
-        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
-        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
       }
     }
   });
@@ -2376,7 +2376,7 @@ const YEAR_COLORS = {
   2020: '#f47067', 2021: '#e0823d', 2022: '#d29922',
   2023: '#bc8cff', 2024: '#58a6ff', 2025: '#f778ba', 2026: '#39d2c0'
 };
-const FALLBACK_COLORS = ['#6e7681', '#8b949e', '#484f58', '#a5d6ff', '#7ee787'];
+const FALLBACK_COLORS = ['#6e7681', '#b0b8c1', '#484f58', '#a5d6ff', '#7ee787'];
 
 function renderSeasonalChart(series) {
   const ctx = document.getElementById('chart-seasonal').getContext('2d');
@@ -2434,7 +2434,7 @@ function renderSeasonalChart(series) {
       responsive: true, maintainAspectRatio: false,
       interaction: {mode: 'nearest', axis: 'x', intersect: false},
       plugins: {
-        legend: {labels: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12, usePointStyle: true}},
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12, usePointStyle: true}},
         tooltip: {
           ...tooltipStyle,
           mode: 'nearest', axis: 'x', intersect: false,
@@ -2462,13 +2462,13 @@ function renderSeasonalChart(series) {
           type: 'linear', min: 1, max: 52,
           grid: {color: 'rgba(33,38,45,0.8)'},
           ticks: {
-            color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, autoSkip: false,
+            color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, autoSkip: false,
             callback: function(v) { const idx = MONTH_WEEKS.indexOf(v); return idx >= 0 ? MONTH_NAMES[idx] : ''; },
             maxRotation: 0
           },
           afterBuildTicks: function(axis) { axis.ticks = MONTH_WEEKS.map(v => ({value: v})); }
         },
-        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
       }
     }
   });
@@ -2569,12 +2569,12 @@ function updateMetaLearnerTab(fc) {
         scales: {
           x: {
             grid: {color: 'rgba(33,38,45,0.8)'},
-            ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}},
-            title: {display: true, text: 'Coefficient (blend weight)', color: '#484f58', font: {family: 'JetBrains Mono', size: 10}}
+            ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}},
+            title: {display: true, text: 'Coefficient (blend weight)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}}
           },
           y: {
             grid: {display: false},
-            ticks: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 11, weight: 'bold'}}
+            ticks: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11, weight: 'bold'}}
           }
         }
       }
@@ -2629,12 +2629,12 @@ function updateMetaLearnerTab(fc) {
         scales: {
           x: {
             grid: {color: 'rgba(33,38,45,0.8)'},
-            ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}},
-            title: {display: true, text: 'Bias adjustment (kbbl)', color: '#484f58', font: {family: 'JetBrains Mono', size: 10}}
+            ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}},
+            title: {display: true, text: 'Bias adjustment (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}}
           },
           y: {
             grid: {display: false},
-            ticks: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 10}}
+            ticks: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}}
           }
         }
       }
@@ -3712,7 +3712,7 @@ function renderBacktestChart(results) {
       responsive: true, maintainAspectRatio: false,
       interaction: {mode: 'index', intersect: false},
       plugins: {
-        legend: {labels: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16}},
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16}},
         tooltip: {
           ...tooltipStyle,
           mode: 'index', intersect: false,
@@ -3726,8 +3726,8 @@ function renderBacktestChart(results) {
         }
       },
       scales: {
-        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
-        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
       }
     }
   });
@@ -3754,7 +3754,7 @@ function renderBtScatter(results) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: {labels: {color: '#8b949e', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12}},
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12}},
         tooltip: {
           ...tooltipStyle,
           callbacks: {
@@ -3766,8 +3766,8 @@ function renderBtScatter(results) {
         }
       },
       scales: {
-        x: {title: {display: true, text: 'Actual (kbbl)', color: '#484f58', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}},
-        y: {title: {display: true, text: 'Predicted (kbbl)', color: '#484f58', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#484f58', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+        x: {title: {display: true, text: 'Actual (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}},
+        y: {title: {display: true, text: 'Predicted (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
       }
     }
   });
