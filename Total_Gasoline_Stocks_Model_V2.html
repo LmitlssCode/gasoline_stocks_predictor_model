@@ -3652,6 +3652,11 @@ function runBacktest(series, horizon, windowSize, sdF) {
   const n = series.length;
   const results = [];
   const startIdx = Math.max(n - windowSize - horizon, SEASON * 2 + 10);
+  const META_RETRAIN_INTERVAL = 8;
+
+  let cachedMeta = null;
+  let cachedWeights = null;
+  let stepsSinceRetrain = META_RETRAIN_INTERVAL;
 
   for (let t = startIdx; t < n - horizon; t++) {
     const sub = series.slice(0, t + 1);
@@ -3662,10 +3667,51 @@ function runBacktest(series, horizon, windowSize, sdF) {
       if (sdF[k]) sdSub[k] = sdF[k].slice(0, t + 1);
     }
 
-    try {
-      const fc = runEnsembleLite(sub, sdSub, horizon);
-      const ensPred = fc.ensemble[horizon - 1];
+    // Retrain meta-learner and weights periodically
+    if (stepsSinceRetrain >= META_RETRAIN_INTERVAL) {
+      const hasSd = countSDFeatures(sdSub) >= 3;
+      cachedWeights = calcWeights(sub, sdSub, !hasSd);
+      cachedMeta = trainMetaLearner(sub, sdSub);
+      stepsSinceRetrain = 0;
+    }
+    stepsSinceRetrain++;
 
+    try {
+      const regime = detectRegime(sub, sdSub);
+      const hasSdData = countSDFeatures(sdSub) >= 3;
+      const m1 = sdRegression(sub, sdSub, horizon);
+      const m2 = sdBalanceModel(sub, sdSub, horizon);
+      const m3 = arModel(sub, horizon);
+      const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+      const needFallback = !hasSdData || primaryCount < 2;
+      const m4 = needFallback ? seasonalNaive(sub, horizon) : null;
+      const m5 = needFallback ? holtWinters(sub, horizon) : null;
+      const models = [m1, m2, m3, m4, m5];
+      const w = cachedWeights || (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+      const fc = [];
+      for (let h = 0; h < horizon; h++) {
+        let val = null;
+        if (cachedMeta && m1 && m2 && m3) {
+          const rf = regimeFeatures(regime);
+          const mf = [m1[h], m2[h], m3[h], ...rf];
+          val = cachedMeta.coeffs[0];
+          for (let j = 0; j < mf.length; j++) val += cachedMeta.coeffs[j + 1] * mf[j];
+          const mo = [m1[h], m2[h], m3[h]];
+          const mn = Math.min(...mo), mx = Math.max(...mo), range = mx - mn;
+          if (val < mn - range * 0.5 || val > mx + range * 0.5) val = null;
+        }
+        if (val == null) {
+          let ws = 0, vs = 0;
+          for (let i = 0; i < NUM_MODELS; i++) {
+            if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+          }
+          val = ws > 0 ? vs / ws : sub[sub.length - 1].value;
+        }
+        fc.push(val);
+      }
+
+      const ensPred = fc[horizon - 1];
       const actual = series[t + horizon].value;
       const predDate = series[t + horizon].date;
       const fromDate = series[t].date;
@@ -3677,9 +3723,9 @@ function runBacktest(series, horizon, windowSize, sdF) {
         fromDate,
         actual,
         ensemble: ensPred,
-        sd: fc.sdRegRaw ? fc.sdRegRaw[horizon - 1] : null,
-        sdbal: fc.sdBalanceRaw ? fc.sdBalanceRaw[horizon - 1] : null,
-        ar: fc.arModelRaw ? fc.arModelRaw[horizon - 1] : null,
+        sd: m1 ? m1[horizon - 1] : null,
+        sdbal: m2 ? m2[horizon - 1] : null,
+        ar: m3 ? m3[horizon - 1] : null,
         error: ensPred - actual,
         absError: Math.abs(ensPred - actual),
         pctError: Math.abs(actual) > 0 ? Math.abs(ensPred - actual) / Math.abs(actual) * 100 : 0,
