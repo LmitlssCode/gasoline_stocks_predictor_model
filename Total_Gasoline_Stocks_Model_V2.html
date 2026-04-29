@@ -2020,27 +2020,64 @@ function calcCI(series, sdF) {
     }
   }
 
-  // Metrics: backtest ensemble accuracy — use real S&D features for consistency
-  const metricWindow = Math.min(VAL_WEEKS, Math.floor(n * 0.1));
+  // Metrics: backtest ensemble accuracy — uses same pipeline as Backtest tab
+  const metricWindow = Math.min(CI_WEEKS, Math.floor(n * 0.25));
   let mape = 0, mae = 0, dOk = 0, dN = 0, mCnt = 0;
+  const METRIC_RETRAIN_INTERVAL = 8;
+  let mMeta = null, mWeights = null, mSteps = METRIC_RETRAIN_INTERVAL;
   for (let w = 1; w <= metricWindow; w++) {
     const sub = series.slice(0, n - metricWindow + w - 1);
+    if (sub.length < SEASON * 2) continue;
     const act = series[n - metricWindow + w - 1].value;
     const sdSub = {};
     for (const k of Object.keys(sdF)) {
       if (sdF[k]) sdSub[k] = sdF[k].slice(0, n - metricWindow + w - 1);
     }
+    if (mSteps >= METRIC_RETRAIN_INTERVAL) {
+      const hasSd = countSDFeatures(sdSub) >= 3;
+      mWeights = calcWeights(sub, sdSub, !hasSd);
+      mMeta = trainMetaLearner(sub, sdSub);
+      mSteps = 0;
+    }
+    mSteps++;
     try {
-      const fc = runEnsembleRaw(sub, sdSub, 1);
-      if (fc && fc[0] != null) {
-        const e = Math.abs(fc[0] - act);
-        mae += e;
-        if (Math.abs(act) > 0) mape += (e / Math.abs(act)) * 100;
-        mCnt++;
-        const lastKnown = sub[sub.length - 1].value;
-        if ((fc[0] >= lastKnown) === (act >= lastKnown)) dOk++;
-        dN++;
+      const regime = detectRegime(sub, sdSub);
+      const m1 = sdRegression(sub, sdSub, 1);
+      const m2 = sdBalanceModel(sub, sdSub, 1);
+      const m3 = arModel(sub, 1);
+      const hasSdData = countSDFeatures(sdSub) >= 3;
+      const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+      const needFb = !hasSdData || primaryCount < 2;
+      const m4 = needFb ? seasonalNaive(sub, 1) : null;
+      const m5 = needFb ? holtWinters(sub, 1) : null;
+      const models = [m1, m2, m3, m4, m5];
+      const wt = mWeights || (needFb ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+      let pred = null;
+      if (mMeta && m1 && m2 && m3) {
+        const rf = regimeFeatures(regime);
+        const mf = [m1[0], m2[0], m3[0], ...rf];
+        pred = mMeta.coeffs[0];
+        for (let j = 0; j < mf.length; j++) pred += mMeta.coeffs[j + 1] * mf[j];
+        const mo = [m1[0], m2[0], m3[0]];
+        const mn = Math.min(...mo), mx = Math.max(...mo), range = mx - mn;
+        if (pred < mn - range * 0.5 || pred > mx + range * 0.5) pred = null;
       }
+      if (pred == null) {
+        let ws = 0, vs = 0;
+        for (let i = 0; i < NUM_MODELS; i++) {
+          if (models[i]) { vs += wt[i] * models[i][0]; ws += wt[i]; }
+        }
+        pred = ws > 0 ? vs / ws : sub[sub.length - 1].value;
+      }
+
+      const e = Math.abs(pred - act);
+      mae += e;
+      if (Math.abs(act) > 0) mape += (e / Math.abs(act)) * 100;
+      mCnt++;
+      const lastKnown = sub[sub.length - 1].value;
+      if ((pred >= lastKnown) === (act >= lastKnown)) dOk++;
+      dN++;
     } catch(e) { /* skip */ }
   }
 
