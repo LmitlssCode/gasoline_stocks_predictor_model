@@ -1,0 +1,3979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Total Gasoline Stocks Model V3</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #06090f;
+  --bg-card: #0d1117;
+  --bg-card-hover: #131a24;
+  --bg-input: #161b22;
+  --border: #21262d;
+  --border-accent: #30363d;
+  --text-primary: #e6edf3;
+  --text-secondary: #b0b8c1;
+  --text-muted: #b0b8c1;
+  --accent-blue: #58a6ff;
+  --accent-green: #3fb950;
+  --accent-red: #f85149;
+  --accent-orange: #d29922;
+  --accent-purple: #bc8cff;
+  --accent-cyan: #39d2c0;
+  --accent-pink: #f778ba;
+  --forecast-1: #58a6ff;
+  --forecast-2: #bc8cff;
+  --forecast-3: #39d2c0;
+  --forecast-4: #d29922;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Outfit', sans-serif;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,.5), 0 8px 32px rgba(0,0,0,.3);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px;scroll-behavior:smooth}
+body{font-family:var(--font-sans);background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+.grain{position:fixed;top:0;left:0;width:100%;height:100%;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0}
+
+/* ─── Header ─── */
+header{position:sticky;top:0;z-index:100;background:rgba(6,9,15,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{font-family:var(--font-mono);font-weight:700;font-size:1rem;letter-spacing:-.5px;white-space:nowrap;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-weight:300;opacity:.7}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.controls select,.controls button{font-family:var(--font-mono);font-size:.78rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;cursor:pointer;transition:all .2s}
+.controls select:hover,.controls button:hover{border-color:var(--accent-blue);background:var(--bg-card-hover)}
+.controls button.primary{background:linear-gradient(135deg,#1a3a5c,#162d4a);border-color:var(--accent-blue);color:var(--accent-blue);font-weight:600}
+.controls button.primary:hover{background:linear-gradient(135deg,#1f4470,#1a3a5c)}
+.controls .sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.data-badge{font-family:var(--font-mono);font-size:.65rem;padding:3px 8px;border-radius:4px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap}
+.data-badge strong{color:var(--text-secondary)}
+.status-pill{font-family:var(--font-mono);font-size:.7rem;padding:4px 10px;border-radius:20px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);white-space:nowrap}
+.status-pill.loading{border-color:var(--accent-orange);color:var(--accent-orange);animation:pulse 1.5s infinite}
+.status-pill.ready{border-color:var(--accent-green);color:var(--accent-green)}
+.status-pill.error{border-color:var(--accent-red);color:var(--accent-red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ─── Layout ─── */
+main{position:relative;z-index:1;max-width:1600px;margin:0 auto;padding:20px 24px;display:grid;gap:14px;grid-template-columns:1fr 1fr}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow);transition:border-color .2s}
+.card:hover{border-color:var(--border-accent)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-family:var(--font-mono);font-size:.75rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-blue);display:inline-block}
+.card-actions{display:flex;gap:6px}
+.card-actions button{font-family:var(--font-mono);font-size:.65rem;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-muted);cursor:pointer;transition:all .15s}
+.card-actions button:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+.full-width{grid-column:1/-1}
+.chart-wrap{position:relative;width:100%}
+.chart-wrap.main-chart{height:420px}
+.chart-wrap.secondary-chart{height:340px}
+
+/* ─── Forecast Cards ─── */
+.forecast-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;grid-column:1/-1}
+.forecast-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .15s,border-color .15s}
+.forecast-card:hover{transform:translateY(-2px);border-color:var(--border-accent)}
+.forecast-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.forecast-card:nth-child(1)::before{background:var(--forecast-1)}
+.forecast-card:nth-child(2)::before{background:var(--forecast-2)}
+.forecast-card:nth-child(3)::before{background:var(--forecast-3)}
+.forecast-card:nth-child(4)::before{background:var(--forecast-4)}
+.fc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.fc-label{font-family:var(--font-mono);font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.fc-badge{font-family:var(--font-mono);font-size:.65rem;padding:2px 6px;border-radius:4px;font-weight:600}
+.fc-badge.up{background:rgba(63,185,80,.12);color:var(--accent-green);border:1px solid rgba(63,185,80,.2)}
+.fc-badge.down{background:rgba(248,81,73,.12);color:var(--accent-red);border:1px solid rgba(248,81,73,.2)}
+.fc-value{font-family:var(--font-mono);font-size:1.5rem;font-weight:700;color:var(--text-primary);line-height:1}
+.fc-sub{font-family:var(--font-mono);font-size:.72rem;color:var(--text-muted);margin-top:4px}
+.fc-adj{font-family:var(--font-mono);font-size:.72rem;color:#f0883e;margin-top:2px;display:none}
+.fc-range{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.fc-yoy{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);margin-top:4px}
+
+/* ─── Metrics ─── */
+.metrics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.metric-item{background:var(--bg-input);border-radius:8px;padding:12px;text-align:center;position:relative}
+.metric-label{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:4px}
+.metric-value{font-family:var(--font-mono);font-size:1.1rem;font-weight:600;color:var(--text-primary);margin-top:4px}
+.metric-desc{font-family:var(--font-mono);font-size:.55rem;color:var(--text-muted);margin-top:4px;line-height:1.3;opacity:0;max-height:0;overflow:hidden;transition:all .2s}
+.metric-item:hover .metric-desc{opacity:1;max-height:40px;margin-top:6px}
+.metric-item[data-quality="good"] .metric-value{color:var(--accent-green)}
+.metric-item[data-quality="ok"] .metric-value{color:var(--accent-orange)}
+.metric-item[data-quality="poor"] .metric-value{color:var(--accent-red)}
+
+/* ─── Tables ─── */
+.data-table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:.75rem}
+th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-accent);color:var(--text-secondary);font-weight:500;text-transform:uppercase;letter-spacing:.5px;font-size:.65rem;position:sticky;top:0;background:var(--bg-card)}
+td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text-primary);transition:background .1s}
+tr:hover td{background:var(--bg-card-hover)}
+td.positive{color:var(--accent-green)}td.negative{color:var(--accent-red)}
+
+/* ─── Time Controls ─── */
+.time-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.time-btn{font-family:var(--font-mono);font-size:.7rem;padding:4px 10px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+.time-btn:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+.time-btn.active{background:var(--accent-blue);color:#06090f;border-color:var(--accent-blue);font-weight:600}
+.time-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+.date-input{font-family:var(--font-mono);font-size:.7rem;padding:4px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);cursor:pointer;color-scheme:dark}
+.date-input:hover{border-color:var(--accent-blue)}
+.date-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+
+/* ─── 5yr avg toggle ─── */
+.toggle-row{display:flex;align-items:center;gap:8px;margin-left:auto}
+.toggle-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase}
+.toggle{position:relative;width:32px;height:18px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle .slider{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--border-accent);border-radius:9px;transition:.2s}
+.toggle .slider::before{content:'';position:absolute;height:14px;width:14px;left:2px;bottom:2px;background:var(--text-muted);border-radius:50%;transition:.2s}
+.toggle input:checked+.slider{background:var(--accent-blue)}
+.toggle input:checked+.slider::before{transform:translateX(14px);background:#fff}
+
+/* ─── Meta-Learner Tab ─── */
+.ml-regime-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:12px 16px}
+.ml-regime-item{background:var(--bg-input);border-radius:var(--radius);padding:10px 14px;text-align:center}
+.ml-regime-label{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.ml-regime-value{font-family:var(--font-mono);font-size:1rem;font-weight:700;color:var(--text-primary)}
+.ml-regime-value.draw{color:var(--accent-orange)}.ml-regime-value.peak{color:var(--accent-red)}.ml-regime-value.build{color:var(--accent-green)}.ml-regime-value.shoulder{color:var(--accent-blue)}
+.ml-regime-value.flag-yes{color:var(--accent-red)}.ml-regime-value.flag-no{color:var(--text-muted)}
+@media(max-width:700px){.ml-regime-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* ─── Collapsible Log ─── */
+.log-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.log-header .chevron{transition:transform .2s;color:var(--text-muted);font-size:.8rem}
+.log-header.open .chevron{transform:rotate(180deg)}
+.log-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.log-body.open{max-height:400px}
+.log-wrap{max-height:250px;overflow-y:auto;background:var(--bg-input);border-radius:6px;padding:10px;font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);line-height:1.6;margin-top:10px}
+.log-wrap .log-ok{color:var(--accent-green)}.log-wrap .log-warn{color:var(--accent-orange)}.log-wrap .log-err{color:var(--accent-red)}
+
+/* ─── Analyst Adjustments ─── */
+.adj-form{display:flex;flex-direction:column;gap:12px}
+.adj-form-row{display:flex;gap:14px;flex-wrap:wrap}
+.adj-field{display:flex;flex-direction:column;gap:5px;min-width:180px}
+.adj-label{font-family:var(--font-mono);font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.adj-field select,.adj-field input[type="number"],.adj-field input[type="text"]{font-family:var(--font-mono);font-size:.78rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;transition:border-color .2s}
+.adj-field select:hover,.adj-field input:hover{border-color:var(--accent-blue)}
+.adj-field select:focus,.adj-field input:focus{border-color:var(--accent-blue);outline:none}
+.adj-dir-toggle{display:flex;gap:4px}
+.adj-dir-btn{font-family:var(--font-mono);font-size:.72rem;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-input);color:var(--text-secondary);cursor:pointer;transition:all .2s;flex:1}
+.adj-dir-btn.active[data-dir="1"]{background:rgba(63,185,80,.12);border-color:var(--accent-green);color:var(--accent-green);font-weight:600}
+.adj-dir-btn.active[data-dir="-1"]{background:rgba(248,81,73,.12);border-color:var(--accent-red);color:var(--accent-red);font-weight:600}
+.adj-dir-btn:hover{border-color:var(--accent-blue)}
+.adj-impact-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.adj-impact-row input{width:120px}
+.adj-presets{display:flex;gap:4px;flex-wrap:wrap}
+.adj-preset{font-family:var(--font-mono);font-size:.65rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.adj-preset:hover{border-color:var(--accent-orange);color:var(--accent-orange)}
+.adj-hint{font-size:.65rem;color:var(--text-muted);font-style:italic}
+.adj-weeks{display:flex;gap:10px;padding-top:2px}
+.adj-week-chk{font-family:var(--font-mono);font-size:.75rem;color:var(--text-secondary);display:flex;align-items:center;gap:4px;cursor:pointer}
+.adj-week-chk input{accent-color:var(--accent-blue)}
+.adj-empty{font-family:var(--font-mono);font-size:.78rem;color:var(--text-muted);text-align:center;padding:24px 16px;border:1px dashed var(--border);border-radius:var(--radius);margin-top:4px}
+#adj-table{width:100%;margin-top:4px}
+#adj-table th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+#adj-table td{font-size:.78rem}
+.adj-total-row{background:var(--bg-input);font-weight:600}
+.adj-total-row td{border-top:2px solid var(--border-accent)}
+.adj-del-btn{font-size:.7rem;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--accent-red);cursor:pointer;transition:all .15s}
+.adj-del-btn:hover{background:rgba(248,81,73,.15);border-color:var(--accent-red)}
+#adj-compare{width:100%;margin-top:4px}
+#adj-compare th{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+#adj-compare td{font-size:.78rem}
+.adj-positive{color:var(--accent-green)}.adj-negative{color:var(--accent-red)}
+
+/* ─── Help Modal ─── */
+#help-modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#help-modal-overlay.open{display:flex}
+#help-modal{background:var(--bg-card);border:1px solid var(--border-accent);border-radius:var(--radius-lg);width:90%;max-width:780px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#help-modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+#help-modal-header h2{font-family:var(--font-mono);font-size:1rem;font-weight:600;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0}
+#help-modal-close{background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);border-radius:var(--radius);padding:4px 10px;cursor:pointer;font-size:.85rem;transition:all .2s}
+#help-modal-close:hover{border-color:var(--accent-blue);color:var(--text-primary)}
+#help-modal-body{padding:20px;overflow-y:auto;font-family:'Outfit',sans-serif;font-size:.85rem;color:var(--text-secondary);line-height:1.7}
+#help-modal-body h1,#help-modal-body h2,#help-modal-body h3{font-family:var(--font-mono);color:var(--text-primary);margin:18px 0 8px}
+#help-modal-body h1{font-size:1.1rem;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+#help-modal-body h2{font-size:.95rem;border-bottom:1px solid var(--border);padding-bottom:6px}
+#help-modal-body h3{font-size:.85rem}
+#help-modal-body p{margin:8px 0}
+#help-modal-body code{font-family:var(--font-mono);font-size:.78rem;background:var(--bg-input);padding:2px 6px;border-radius:4px;color:var(--accent-cyan)}
+#help-modal-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.78rem}
+#help-modal-body th,#help-modal-body td{text-align:left;padding:6px 10px;border:1px solid var(--border)}
+#help-modal-body th{background:var(--bg-input);color:var(--text-primary);font-weight:600}
+#help-modal-body strong{color:var(--text-primary)}
+#help-modal-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+#help-modal-body ul,#help-modal-body ol{padding-left:20px;margin:8px 0}
+#help-modal-body li{margin:4px 0}
+#help-modal-body blockquote{border-left:3px solid var(--accent-blue);padding:8px 14px;margin:10px 0;background:var(--bg-input);border-radius:0 var(--radius) var(--radius) 0}
+#help-modal-body a{color:var(--accent-cyan);text-decoration:none}
+#help-modal-body a:hover{text-decoration:underline}
+
+/* ─── Loading ─── */
+#loading-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-primary);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity .5s}
+#loading-overlay.hidden{opacity:0;pointer-events:none}
+.loader-title{font-family:var(--font-mono);font-size:1.2rem;font-weight:700;background:linear-gradient(135deg,var(--accent-blue),var(--accent-cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:20px}
+.loader-bar-track{width:300px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.loader-bar-fill{height:100%;width:0%;border-radius:2px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-cyan));transition:width .3s}
+.loader-status{font-family:var(--font-mono);font-size:.75rem;color:var(--text-secondary);margin-top:12px}
+
+/* ─── Page Tabs ─── */
+.page-tabs{grid-column:1/-1;display:flex;gap:4px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:4px;box-shadow:var(--shadow)}
+.page-tab{flex:1;font-family:var(--font-mono);font-size:.78rem;font-weight:500;padding:10px 16px;border-radius:var(--radius);border:none;background:transparent;color:var(--text-muted);cursor:pointer;transition:all .2s;text-align:center;letter-spacing:.3px}
+.page-tab:hover{color:var(--text-secondary);background:var(--bg-input)}
+.page-tab.active{background:linear-gradient(135deg,#1a3a5c,#162d4a);color:var(--accent-blue);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.tab-panel{display:none;grid-column:1/-1}
+.tab-panel.active{display:contents}
+
+/* ─── Backtest ─── */
+.bt-summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;grid-column:1/-1}
+.bt-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;box-shadow:var(--shadow)}
+.bt-stat-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.bt-stat-value{font-family:var(--font-mono);font-size:1.4rem;font-weight:700;color:var(--text-primary)}
+.bt-stat-sub{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);margin-top:4px}
+.bt-controls{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.bt-controls select{font-family:var(--font-mono);font-size:.75rem;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;cursor:pointer}
+.bt-controls .bt-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);text-transform:uppercase}
+.bt-running{font-family:var(--font-mono);font-size:.7rem;color:var(--accent-orange);animation:pulse 1.5s infinite}
+.bt-error-bar{display:flex;align-items:center;gap:6px;margin:2px 0}
+.bt-error-bar-label{font-family:var(--font-mono);font-size:.65rem;color:var(--text-secondary);width:80px;text-align:right;flex-shrink:0}
+.bt-error-bar-track{flex:1;height:8px;background:var(--bg-input);border-radius:4px;overflow:hidden}
+.bt-error-bar-fill{height:100%;border-radius:4px;transition:width .3s}
+.bt-error-bar-val{font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);width:50px;flex-shrink:0}
+
+/* ─── Responsive ─── */
+@media(max-width:1100px){.forecast-row{grid-template-columns:repeat(2,1fr)}.bt-summary-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){main{grid-template-columns:1fr}header{padding:10px 14px}.forecast-row{grid-template-columns:repeat(2,1fr)}.metrics-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.forecast-row{grid-template-columns:1fr}.metrics-grid{grid-template-columns:1fr}.controls{gap:6px}.controls select,.controls button{font-size:.7rem;padding:5px 8px}}
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div id="loading-overlay">
+  <div class="loader-title">TOTAL GASOLINE STOCKS MODEL V2</div>
+  <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-fill"></div></div>
+  <div class="loader-status" id="loader-status">Initializing...</div>
+</div>
+<header>
+  <div class="logo">TOTAL GAS MODEL <span>v6.3</span></div>
+  <div class="controls">
+    <select id="sel-padd">
+      <option value="NUS">U.S. Total</option>
+      <option value="R10">PADD 1 — East Coast</option>
+      <option value="R20">PADD 2 — Midwest</option>
+      <option value="R30">PADD 3 — Gulf Coast</option>
+      <option value="R40">PADD 4 — Rocky Mountain</option>
+      <option value="R50">PADD 5 — West Coast</option>
+    </select>
+    <div class="sep"></div>
+    <button class="primary" id="btn-run">&#9654; Run Forecast</button>
+    <button id="btn-refresh" title="Reload latest data from EIA">&#8635; Refresh</button>
+    <button id="btn-export" title="Export forecast data to CSV">&#8615; CSV</button>
+    <button id="btn-help" title="View model documentation">&#9432; Model Help</button>
+  </div>
+  <div class="header-right">
+    <div class="data-badge" id="sd-badge" title="Supply &amp; Demand data status">S&D: <strong>—</strong></div>
+    <div class="data-badge" id="data-badge">Latest: <strong>—</strong></div>
+    <div class="status-pill loading" id="status-pill">LOADING</div>
+  </div>
+</header>
+<main>
+  <!-- Page Tabs -->
+  <div class="page-tabs">
+    <button class="page-tab active" data-tab="forecast">&#9654; Forecast</button>
+    <button class="page-tab" data-tab="backtest">&#9881; Backtest — Predictions vs Actuals</button>
+    <button class="page-tab" data-tab="metalearner">&#9881; Meta-Learner — How It Blends</button>
+    <button class="page-tab" data-tab="adjustments">&#9998; Analyst Adjustments</button>
+  </div>
+
+  <!-- ==================== FORECAST TAB ==================== -->
+  <div class="tab-panel active" id="tab-forecast">
+
+  <!-- Forecast Cards -->
+  <div class="forecast-row">
+    <div class="forecast-card">
+      <div class="fc-top"><div class="fc-label">+1 Week</div><div class="fc-badge" id="fc1-badge"></div></div>
+      <div class="fc-value" id="fc1-val">—</div>
+      <div class="fc-sub" id="fc1-sub"></div>
+      <div class="fc-adj" id="fc1-adj"></div>
+      <div class="fc-range" id="fc1-rng"></div>
+      <div class="fc-yoy" id="fc1-yoy"></div>
+    </div>
+    <div class="forecast-card">
+      <div class="fc-top"><div class="fc-label">+2 Weeks</div><div class="fc-badge" id="fc2-badge"></div></div>
+      <div class="fc-value" id="fc2-val">—</div>
+      <div class="fc-sub" id="fc2-sub"></div>
+      <div class="fc-adj" id="fc2-adj"></div>
+      <div class="fc-range" id="fc2-rng"></div>
+      <div class="fc-yoy" id="fc2-yoy"></div>
+    </div>
+    <div class="forecast-card">
+      <div class="fc-top"><div class="fc-label">+3 Weeks</div><div class="fc-badge" id="fc3-badge"></div></div>
+      <div class="fc-value" id="fc3-val">—</div>
+      <div class="fc-sub" id="fc3-sub"></div>
+      <div class="fc-adj" id="fc3-adj"></div>
+      <div class="fc-range" id="fc3-rng"></div>
+      <div class="fc-yoy" id="fc3-yoy"></div>
+    </div>
+    <div class="forecast-card">
+      <div class="fc-top"><div class="fc-label">+4 Weeks</div><div class="fc-badge" id="fc4-badge"></div></div>
+      <div class="fc-value" id="fc4-val">—</div>
+      <div class="fc-sub" id="fc4-sub"></div>
+      <div class="fc-adj" id="fc4-adj"></div>
+      <div class="fc-range" id="fc4-rng"></div>
+      <div class="fc-yoy" id="fc4-yoy"></div>
+    </div>
+  </div>
+
+  <!-- Main Chart -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot"></span>STOCK LEVELS & FORECAST</div>
+      <div class="toggle-row">
+        <span class="toggle-label">5-Yr Avg Band</span>
+        <label class="toggle"><input type="checkbox" id="chk-5yr" checked><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="time-controls">
+      <button class="time-btn" data-range="6m">6M</button>
+      <button class="time-btn active" data-range="1y">1Y</button>
+      <button class="time-btn" data-range="2y">2Y</button>
+      <button class="time-btn" data-range="5y">5Y</button>
+      <button class="time-btn" data-range="all">ALL</button>
+      <div class="time-sep"></div>
+      <span class="date-label">From</span>
+      <input type="date" class="date-input" id="date-from">
+      <span class="date-label">To</span>
+      <input type="date" class="date-input" id="date-to">
+    </div>
+    <div class="chart-wrap main-chart"><canvas id="chart-main"></canvas></div>
+  </div>
+
+  <!-- Seasonal Chart -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>SEASONAL OVERLAY</div>
+    </div>
+    <div class="chart-wrap secondary-chart"><canvas id="chart-seasonal"></canvas></div>
+  </div>
+
+  <!-- Model Performance -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>MODEL PERFORMANCE</div>
+    </div>
+    <div class="metrics-grid">
+      <div class="metric-item" id="mi-mape"><div class="metric-label">Ensemble MAPE</div><div class="metric-value" id="m-mape">—</div><div class="metric-desc">Mean Absolute % Error — lower is better</div></div>
+      <div class="metric-item" id="mi-mae"><div class="metric-label">Ensemble MAE</div><div class="metric-value" id="m-mae">—</div><div class="metric-desc">Mean Absolute Error in kbbl</div></div>
+      <div class="metric-item" id="mi-dir"><div class="metric-label">Direction Acc.</div><div class="metric-value" id="m-dir">—</div><div class="metric-desc">% of times direction (up/down) was correct</div></div>
+      <div class="metric-item"><div class="metric-label">S&D Reg Wt</div><div class="metric-value" id="m-w1">—</div><div class="metric-desc">S&D regression (feature-selected) weight</div></div>
+      <div class="metric-item"><div class="metric-label">S&D Bal Wt</div><div class="metric-value" id="m-w2">—</div><div class="metric-desc">Seasonal S&D balance model weight</div></div>
+      <div class="metric-item"><div class="metric-label">AR Model Wt</div><div class="metric-value" id="m-w3">—</div><div class="metric-desc">Autoregressive lag model weight</div></div>
+      <div class="metric-item"><div class="metric-label">Regime</div><div class="metric-value" id="m-regime">—</div><div class="metric-desc">Current market regime (draw/peak/build/shoulder)</div></div>
+      <div class="metric-item"><div class="metric-label">Meta-Learner</div><div class="metric-value" id="m-meta">—</div><div class="metric-desc">Stacked generalization status</div></div>
+      <div class="metric-item"><div class="metric-label">Val. Window</div><div class="metric-value" id="m-valw">—</div><div class="metric-desc">Weeks used for weight backtesting</div></div>
+      <div class="metric-item"><div class="metric-label">CI Window</div><div class="metric-value" id="m-ciw">—</div><div class="metric-desc">Weeks used for CI estimation</div></div>
+      <div class="metric-item"><div class="metric-label">S&D Features</div><div class="metric-value" id="m-sdcount">—</div><div class="metric-desc"># of S&D data series loaded</div></div>
+      <div class="metric-item"><div class="metric-label">Models Active</div><div class="metric-value" id="m-active">—</div><div class="metric-desc"># of models contributing to ensemble</div></div>
+    </div>
+  </div>
+
+  <!-- Cross-PADD -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>CROSS-PADD SNAPSHOT</div>
+    </div>
+    <div class="data-table-wrap">
+      <table><thead><tr><th>Region</th><th>Latest (kbbl)</th><th>Wk Chg</th><th>+1W Fcst (kbbl)</th><th>+4W Fcst (kbbl)</th><th>vs 5Y Avg</th></tr></thead><tbody id="padd-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Detailed Forecast Table -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-pink)"></span>DETAILED FORECAST TABLE</div>
+      <div class="card-actions"><button id="btn-export-detail" title="Copy table to clipboard">Copy</button></div>
+    </div>
+    <div class="data-table-wrap">
+      <table><thead><tr><th>Week Ending</th><th>Ensemble (kbbl)</th><th>Chg (kbbl)</th><th>Low 80% (kbbl)</th><th>High 80% (kbbl)</th><th>S&D Reg (kbbl)</th><th>S&D Bal (kbbl)</th><th>AR Model (kbbl)</th><th id="detail-adj-th" style="display:none">Adjusted (kbbl)</th></tr></thead><tbody id="detail-tbody"></tbody></table>
+    </div>
+  </div>
+
+  </div><!-- /tab-forecast -->
+
+  <!-- ==================== BACKTEST TAB ==================== -->
+  <div class="tab-panel" id="tab-backtest">
+
+  <!-- Backtest Summary Stats -->
+  <div class="bt-summary-row">
+    <div class="bt-stat"><div class="bt-stat-label">Backtest MAPE</div><div class="bt-stat-value" id="bt-mape">—</div><div class="bt-stat-sub">Mean Abs % Error</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Backtest MAE</div><div class="bt-stat-value" id="bt-mae">—</div><div class="bt-stat-sub">Mean Abs Error (kbbl)</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Direction Accuracy</div><div class="bt-stat-value" id="bt-dir">—</div><div class="bt-stat-sub">Correct up/down calls</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Weeks Tested</div><div class="bt-stat-value" id="bt-count">—</div><div class="bt-stat-sub" id="bt-range-label">—</div></div>
+  </div>
+
+  <!-- Backtest Chart: Predicted vs Actual -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>PREDICTED vs ACTUAL</div>
+      <div class="bt-controls">
+        <span class="bt-label">Horizon</span>
+        <select id="bt-horizon">
+          <option value="1">+1 Week Ahead</option>
+          <option value="2">+2 Weeks Ahead</option>
+          <option value="3">+3 Weeks Ahead</option>
+          <option value="4">+4 Weeks Ahead</option>
+        </select>
+        <span class="bt-label">Window</span>
+        <select id="bt-window">
+          <option value="26">26 Weeks</option>
+          <option value="52" selected>52 Weeks</option>
+          <option value="104">104 Weeks</option>
+        </select>
+        <button class="primary" id="btn-bt-run" style="font-size:.72rem;padding:5px 12px">&#9654; Run Backtest</button>
+        <span class="bt-running" id="bt-spinner" style="display:none">Running...</span>
+      </div>
+    </div>
+    <div class="chart-wrap main-chart"><canvas id="chart-backtest"></canvas></div>
+  </div>
+
+  <!-- Per-Model Error Comparison -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>MODEL ERROR COMPARISON</div>
+    </div>
+    <div id="bt-error-bars">
+      <div class="bt-error-bar"><span class="bt-error-bar-label">Ensemble</span><div class="bt-error-bar-track"><div class="bt-error-bar-fill" id="btbar-ens" style="background:var(--accent-cyan)"></div></div><span class="bt-error-bar-val" id="btval-ens">—</span></div>
+      <div class="bt-error-bar"><span class="bt-error-bar-label">S&D Reg</span><div class="bt-error-bar-track"><div class="bt-error-bar-fill" id="btbar-sd" style="background:var(--accent-orange)"></div></div><span class="bt-error-bar-val" id="btval-sd">—</span></div>
+      <div class="bt-error-bar"><span class="bt-error-bar-label">S&D Bal</span><div class="bt-error-bar-track"><div class="bt-error-bar-fill" id="btbar-sdbal" style="background:var(--accent-red)"></div></div><span class="bt-error-bar-val" id="btval-sdbal">—</span></div>
+      <div class="bt-error-bar"><span class="bt-error-bar-label">AR Model</span><div class="bt-error-bar-track"><div class="bt-error-bar-fill" id="btbar-ar" style="background:var(--text-muted)"></div></div><span class="bt-error-bar-val" id="btval-ar">—</span></div>
+    </div>
+  </div>
+
+  <!-- Scatter: Predicted vs Actual -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>SCATTER — PREDICTED vs ACTUAL</div>
+    </div>
+    <div class="chart-wrap secondary-chart"><canvas id="chart-bt-scatter"></canvas></div>
+  </div>
+
+  <!-- Backtest Detail Table -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-pink)"></span>BACKTEST DETAIL TABLE</div>
+      <div class="card-actions"><button id="btn-bt-copy" title="Copy table to clipboard">Copy</button></div>
+    </div>
+    <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
+      <table><thead><tr><th>Forecast Date</th><th>Predicted (kbbl)</th><th>Actual (kbbl)</th><th>Error (kbbl)</th><th>Error %</th><th>Direction</th><th>S&D Reg (kbbl)</th><th>S&D Bal (kbbl)</th><th>AR (kbbl)</th></tr></thead><tbody id="bt-tbody"></tbody></table>
+    </div>
+  </div>
+
+  </div><!-- /tab-backtest -->
+
+  <!-- ==================== META-LEARNER TAB ==================== -->
+  <div class="tab-panel" id="tab-metalearner">
+
+  <!-- Meta-Learner Summary Stats -->
+  <div class="bt-summary-row">
+    <div class="bt-stat"><div class="bt-stat-label">Status</div><div class="bt-stat-value" id="ml-status">—</div><div class="bt-stat-sub">Meta-learner active?</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Training Samples</div><div class="bt-stat-value" id="ml-samples">—</div><div class="bt-stat-sub">Backtest weeks used</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Features</div><div class="bt-stat-value" id="ml-features">—</div><div class="bt-stat-sub">3 model preds + 7 regime</div></div>
+    <div class="bt-stat"><div class="bt-stat-label">Ridge Penalty</div><div class="bt-stat-value" id="ml-ridge">0.5</div><div class="bt-stat-sub">Regularization strength</div></div>
+  </div>
+
+  <!-- Current Regime Detection -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>CURRENT REGIME</div>
+    </div>
+    <div class="ml-regime-grid" id="ml-regime-grid">
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">Season</div>
+        <div class="ml-regime-value" id="ml-r-season">—</div>
+      </div>
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">Week of Year</div>
+        <div class="ml-regime-value" id="ml-r-week">—</div>
+      </div>
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">Volatility Ratio</div>
+        <div class="ml-regime-value" id="ml-r-vol">—</div>
+      </div>
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">High Volatility?</div>
+        <div class="ml-regime-value" id="ml-r-hivol">—</div>
+      </div>
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">Turnaround?</div>
+        <div class="ml-regime-value" id="ml-r-turn">—</div>
+      </div>
+      <div class="ml-regime-item">
+        <div class="ml-regime-label">Momentum</div>
+        <div class="ml-regime-value" id="ml-r-mom">—</div>
+      </div>
+    </div>
+    <div style="padding:0 16px 12px;font-size:.7rem;color:var(--text-muted);line-height:1.5">
+      The regime detector classifies the current market environment. <strong>Season</strong> is based on gasoline demand cycle (draw = spring drawdowns, peak = summer, build = fall restocking, shoulder = winter). <strong>Volatility ratio</strong> compares recent 8-week volatility to the trailing 52-week baseline (>1.5x = high vol). <strong>Turnaround</strong> flags when refinery utilization drops >3 pts in 4 weeks. <strong>Momentum</strong> measures whether stock changes are accelerating (+) or decelerating (-).
+    </div>
+  </div>
+
+  <!-- Regime Feature Vector -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>REGIME FEATURE VECTOR (what the meta-learner sees)</div>
+    </div>
+    <div class="data-table-wrap">
+      <table>
+        <thead><tr><th>Feature</th><th>Current Value</th><th>Description</th></tr></thead>
+        <tbody id="ml-feat-tbody"></tbody>
+      </table>
+    </div>
+    <div style="padding:4px 16px 12px;font-size:.68rem;color:var(--text-muted)">
+      These 7 values are appended to the 3 model predictions to form the meta-learner's 10-feature input vector.
+    </div>
+  </div>
+
+  <!-- Meta-Learner Coefficients — Model Blend Weights -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>MODEL BLEND WEIGHTS</div>
+    </div>
+    <div style="padding:0 16px 4px;font-size:.7rem;color:var(--text-muted);line-height:1.5">
+      How much each model's prediction contributes to the final blend. These multiply against ~240k stock values, so small coefficients produce large contributions. A negative weight means the meta-learner learned that model tends to overshoot and subtracts part of its prediction.
+    </div>
+    <div class="chart-wrap" style="height:140px"><canvas id="chart-ml-blend"></canvas></div>
+  </div>
+
+  <!-- Meta-Learner Coefficients — Regime Bias Adjustments -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>REGIME BIAS ADJUSTMENTS</div>
+    </div>
+    <div style="padding:0 16px 4px;font-size:.7rem;color:var(--text-muted);line-height:1.5">
+      Context-dependent corrections (in kbbl) that shift the prediction up or down based on current market regime. These multiply against 0/1 flags or small numbers, so the coefficients are large. Only active features (non-zero) contribute to the current forecast.
+    </div>
+    <div class="chart-wrap" style="height:260px"><canvas id="chart-ml-regime"></canvas></div>
+  </div>
+
+  <!-- Blending Walkthrough -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>BLENDING WALKTHROUGH — Step by Step</div>
+    </div>
+    <div style="padding:0 16px 6px;font-size:.7rem;color:var(--text-muted);line-height:1.5">
+      For each forecast week, the meta-learner computes: <code style="color:var(--accent-cyan)">prediction = intercept + c1 &times; S&D_Reg + c2 &times; S&D_Bal + c3 &times; AR + c4 &times; is_draw + ... + c10 &times; momentum</code>. If the result falls outside a reasonable range, it falls back to the inverse-MAE weighted average.
+    </div>
+    <div class="data-table-wrap">
+      <table>
+        <thead><tr><th>Component</th><th>Coeff</th><th>+1 Week (kbbl)</th><th>+2 Weeks (kbbl)</th><th>+3 Weeks (kbbl)</th><th>+4 Weeks (kbbl)</th></tr></thead>
+        <tbody id="ml-blend-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Fallback Weight Comparison -->
+  <div class="card full-width">
+    <div class="card-header">
+      <div class="card-title"><span class="dot" style="background:var(--accent-pink)"></span>FALLBACK: INVERSE-MAE WEIGHTS</div>
+    </div>
+    <div style="padding:0 16px 6px;font-size:.7rem;color:var(--text-muted);line-height:1.5">
+      When the meta-learner is inactive or its output fails the sanity check, the ensemble falls back to these weights (calculated from recent backtest MAE — lower error = higher weight, with exponential decay favoring recent weeks).
+    </div>
+    <div style="padding:8px 16px 16px" id="ml-fallback-bars"></div>
+  </div>
+
+  </div><!-- /tab-metalearner -->
+
+  <!-- ═══ Analyst Adjustments Tab ═══ -->
+  <div class="tab-panel" id="tab-adjustments">
+
+    <!-- Adjustment Builder -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--accent-orange)"></span>Add Adjustment</div></div>
+      <div class="adj-form">
+        <div class="adj-form-row">
+          <div class="adj-field">
+            <label class="adj-label">Event Type</label>
+            <select id="adj-type">
+              <option value="refinery_outage">Refinery Outage</option>
+              <option value="pipeline_disruption">Pipeline Disruption</option>
+              <option value="weather_event">Weather Event</option>
+              <option value="maintenance">Maintenance / Turnaround</option>
+              <option value="trade_shift">Import / Export Shift</option>
+              <option value="demand_shock">Demand Shock</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="adj-field">
+            <label class="adj-label">Direction</label>
+            <div class="adj-dir-toggle">
+              <button class="adj-dir-btn active" data-dir="1" id="adj-dir-bull">Bullish (Builds)</button>
+              <button class="adj-dir-btn" data-dir="-1" id="adj-dir-bear">Bearish (Draws)</button>
+            </div>
+          </div>
+        </div>
+        <div class="adj-form-row">
+          <div class="adj-field">
+            <label class="adj-label">Impact (kbbl)</label>
+            <div class="adj-impact-row">
+              <input type="number" id="adj-impact" placeholder="e.g. 3000" step="100" min="0">
+              <div class="adj-presets" id="adj-presets"></div>
+            </div>
+            <div class="adj-hint" id="adj-hint">Preset suggestions will appear based on event type and region</div>
+          </div>
+          <div class="adj-field">
+            <label class="adj-label">Weeks Affected</label>
+            <div class="adj-weeks">
+              <label class="adj-week-chk"><input type="checkbox" value="0" checked> +1W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="1" checked> +2W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="2"> +3W</label>
+              <label class="adj-week-chk"><input type="checkbox" value="3"> +4W</label>
+            </div>
+          </div>
+        </div>
+        <div class="adj-form-row">
+          <div class="adj-field" style="flex:1">
+            <label class="adj-label">Notes (optional)</label>
+            <input type="text" id="adj-notes" placeholder="e.g. Gulf Coast refinery fire — expected 2-week impact" maxlength="200">
+          </div>
+          <div class="adj-field" style="flex:0 0 auto;align-self:flex-end">
+            <button class="primary" id="btn-adj-add">+ Add Adjustment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Adjustments -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--accent-cyan)"></span>Active Adjustments</div>
+        <div class="card-actions"><button id="btn-adj-clear">Clear All</button></div>
+      </div>
+      <div id="adj-empty" class="adj-empty">No adjustments added. Use the form above to overlay analyst estimates on the model forecast.</div>
+      <div style="overflow-x:auto">
+        <table id="adj-table" style="display:none">
+          <thead><tr>
+            <th>Event</th>
+            <th>Direction</th>
+            <th>Impact (kbbl)</th>
+            <th>+1W</th><th>+2W</th><th>+3W</th><th>+4W</th>
+            <th>Notes</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="adj-tbody"></tbody>
+          <tfoot><tr class="adj-total-row">
+            <td colspan="2"><strong>Net Adjustment</strong></td>
+            <td id="adj-total-impact"></td>
+            <td id="adj-total-w1"></td><td id="adj-total-w2"></td><td id="adj-total-w3"></td><td id="adj-total-w4"></td>
+            <td colspan="2"></td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Adjusted Forecast Summary -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--accent-green)"></span>Adjusted vs. Model Forecast</div></div>
+      <div id="adj-compare-empty" class="adj-empty">Add adjustments to see the comparison.</div>
+      <table id="adj-compare" style="display:none">
+        <thead><tr>
+          <th>Week</th>
+          <th>Model Ensemble (kbbl)</th>
+          <th>Adjustment (kbbl)</th>
+          <th>Adjusted Forecast (kbbl)</th>
+          <th>Change from Model</th>
+        </tr></thead>
+        <tbody id="adj-compare-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Adjustment Journal — Scorecard -->
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header">
+        <div class="card-title"><span class="dot" style="background:var(--accent-purple)"></span>Adjustment Journal — Performance Tracker</div>
+        <div class="card-actions"><button id="btn-journal-clear">Clear Journal</button></div>
+      </div>
+      <p style="font-size:.75rem;color:var(--text-secondary);margin:0 0 12px;line-height:1.5">
+        Every adjustment is logged with a snapshot of the model forecast. When actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone.
+      </p>
+      <div id="journal-empty" class="adj-empty">No scored journal entries yet. Add adjustments and wait for actual data to arrive for scoring.</div>
+      <div id="journal-scorecard" style="display:none">
+        <div class="metrics-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-entries">—</div><div class="metric-label">Scored Entries</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-pct">—</div><div class="metric-label">Adj. Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-model-pct">—</div><div class="metric-label">Model Closer to Actual</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-improvement">—</div><div class="metric-label">MAE Improvement</div></div>
+        </div>
+        <div class="metrics-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px">
+          <div class="metric-item"><div class="metric-value" id="j-model-mae">—</div><div class="metric-label">Avg Model MAE (kbbl)</div></div>
+          <div class="metric-item"><div class="metric-value" id="j-adj-mae">—</div><div class="metric-label">Avg Adjusted MAE (kbbl)</div></div>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="journal-table" style="display:none">
+          <thead><tr>
+            <th>Date Logged</th>
+            <th>Event</th>
+            <th>Region</th>
+            <th>Dir.</th>
+            <th>Impact</th>
+            <th>Model +1W</th>
+            <th>Adj. +1W</th>
+            <th>Actual +1W</th>
+            <th>Winner</th>
+            <th>Notes</th>
+          </tr></thead>
+          <tbody id="journal-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-adjustments -->
+
+  <!-- Engine Log (collapsible) -->
+  <div class="card full-width">
+    <div class="log-header" id="log-toggle">
+      <div class="card-title" style="margin-bottom:0"><span class="dot" style="background:var(--text-muted)"></span>ENGINE LOG</div>
+      <span class="chevron">&#9660;</span>
+    </div>
+    <div class="log-body" id="log-body">
+      <div class="log-wrap" id="log-wrap"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Help Modal -->
+<div id="help-modal-overlay">
+  <div id="help-modal">
+    <div id="help-modal-header">
+      <h2>&#9432; Model Documentation</h2>
+      <button id="help-modal-close">&times; Close</button>
+    </div>
+    <div id="help-modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG  (v6.3 — accuracy improvements: per-horizon meta-learner, feature normalization, PADD data)
+// ═══════════════════════════════════════════════════════════
+const API_KEY = 'pMqnFqpdhwFV0XzZGK0G5ECuAqx1N4v68AxsRBkI';
+const BASE = 'https://api.eia.gov/v2';
+const TIMEOUT = 15000;
+const HIST_YEARS = 6;
+const FC_WEEKS = 4;
+const SEASON = 52;
+const VAL_WEEKS = 20;
+const CI_WEEKS = 52;         // v5: extended CI backtest window
+const META_VAL_WEEKS = 30;   // v5: meta-learner training window
+const SD_RIDGE = 1.0;        // v5: stronger ridge for S&D regression (was 0.01)
+const NUM_MODELS = 5;        // v5: 3 primary + 2 fallback (same slots for compat)
+const PADDS = ['NUS','R10','R20','R30','R40','R50'];
+const PL = {NUS:'U.S. Total',R10:'PADD 1 (East Coast)',R20:'PADD 2 (Midwest)',R30:'PADD 3 (Gulf Coast)',R40:'PADD 4 (Rocky Mtn)',R50:'PADD 5 (West Coast)'};
+
+const PRODUCT_KEY = 'totalMotorGas';
+const PRODUCT_CFG = {
+  label: 'Total Motor Gasoline',
+  endpoint: 'stoc',
+  productCode: 'EPM0'
+};
+
+// S&D data store — keyed like the dashboard: "category_product_area"
+const SD_DATA = {};
+
+// ═══════════════════════════════════════════════════════════
+// ANALYST ADJUSTMENTS ENGINE
+// ═══════════════════════════════════════════════════════════
+const ADJ_PRESETS_NUS = {
+  refinery_outage:      [1500, 4000, 10000],
+  pipeline_disruption:  [1000, 3000, 8000],
+  weather_event:        [2000, 5000, 12000],
+  maintenance:          [1000, 3000, 7000],
+  trade_shift:          [800, 2500, 6000],
+  demand_shock:         [1000, 3000, 7000],
+  other:                [500, 2000, 5000]
+};
+const ADJ_PRESET_LABELS = ['Minor', 'Moderate', 'Major'];
+const ADJ_TYPE_LABELS = {
+  refinery_outage: 'Refinery Outage', pipeline_disruption: 'Pipeline Disruption',
+  weather_event: 'Weather Event', maintenance: 'Maintenance / Turnaround',
+  trade_shift: 'Import / Export Shift', demand_shock: 'Demand Shock', other: 'Other'
+};
+let analystAdjustments = [];
+let adjIdCounter = 0;
+
+function getAdjPresets(eventType) {
+  // Scale presets by PADD's share of national stocks if a PADD is selected
+  const base = ADJ_PRESETS_NUS[eventType] || ADJ_PRESETS_NUS.other;
+  const padd = document.getElementById('sel-padd').value;
+  if (padd === 'NUS') return base;
+
+  const app = window.__app;
+  if (!app || !app.rawData || !app.currentSeries) return base.map(v => Math.round(v * 0.2));
+  const pk = PRODUCT_KEY;
+  const nusRaw = app.rawData[pk];
+  if (!nusRaw) return base.map(v => Math.round(v * 0.2));
+  const nusSeries = extractSeries(nusRaw, 'NUS');
+  if (!nusSeries || nusSeries.length < 10) return base.map(v => Math.round(v * 0.2));
+
+  const paddLast = app.currentSeries[app.currentSeries.length - 1].value;
+  const nusLast = nusSeries[nusSeries.length - 1].value;
+  const share = nusLast > 0 ? paddLast / nusLast : 0.2;
+  return base.map(v => Math.round(v * share / 100) * 100);
+}
+
+function getNetAdjustments() {
+  const net = [0, 0, 0, 0];
+  for (const adj of analystAdjustments) {
+    for (let h = 0; h < 4; h++) {
+      if (adj.weeks[h]) net[h] += adj.direction * adj.impact;
+    }
+  }
+  return net;
+}
+
+function getAdjustedForecast(fc) {
+  if (!fc || analystAdjustments.length === 0) return null;
+  const net = getNetAdjustments();
+  return fc.ensemble.map((v, h) => v + net[h]);
+}
+
+function saveAdjustments() {
+  try { localStorage.setItem('total_gas_adj_v6', JSON.stringify(analystAdjustments)); } catch(e) {}
+}
+
+function loadAdjustments() {
+  try {
+    const raw = localStorage.getItem('total_gas_adj_v6');
+    if (raw) {
+      analystAdjustments = JSON.parse(raw);
+      adjIdCounter = analystAdjustments.reduce((mx, a) => Math.max(mx, a.id || 0), 0) + 1;
+    }
+  } catch(e) { analystAdjustments = []; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ADJUSTMENT JOURNAL — tracks adjustment accuracy over time
+// ═══════════════════════════════════════════════════════════
+const JOURNAL_KEY = 'total_gas_journal_v6';
+let adjustmentJournal = [];
+
+function loadJournal() {
+  try {
+    const raw = localStorage.getItem(JOURNAL_KEY);
+    if (raw) adjustmentJournal = JSON.parse(raw);
+  } catch(e) { adjustmentJournal = []; }
+}
+
+function saveJournal() {
+  try { localStorage.setItem(JOURNAL_KEY, JSON.stringify(adjustmentJournal)); } catch(e) {}
+}
+
+// Called when user adds an adjustment — snapshot the current model state
+function journalLogAdjustment(adj, modelForecast, padd) {
+  const app = window.__app;
+  if (!app || !app.currentSeries || !modelForecast) return;
+  const lastDate = app.currentSeries[app.currentSeries.length - 1].date;
+  const ld = new Date(lastDate);
+  const forecastDates = Array.from({length: FC_WEEKS}, (_, h) => {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    return d.toISOString().split('T')[0];
+  });
+
+  const entry = {
+    id: Date.now(),
+    createdAt: new Date().toISOString(),
+    adjType: adj.type,
+    direction: adj.direction,
+    impact: adj.impact,
+    weeks: adj.weeks,
+    notes: adj.notes,
+    padd: padd,
+    dataAsOf: lastDate,
+    forecastDates: forecastDates,
+    modelEnsemble: modelForecast.ensemble.slice(),
+    adjustedEnsemble: modelForecast.ensemble.map((v, h) => v + (adj.weeks[h] ? adj.direction * adj.impact : 0)),
+    actuals: [null, null, null, null],
+    scored: false
+  };
+  adjustmentJournal.push(entry);
+  saveJournal();
+}
+
+// Called whenever new data loads — check if any journal entries can be scored
+function journalScoreEntries(series) {
+  if (!series || series.length === 0) return;
+  const dateMap = {};
+  series.forEach(d => dateMap[d.date] = d.value);
+
+  let updated = false;
+  for (const entry of adjustmentJournal) {
+    if (entry.scored) continue;
+    let allScored = true;
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] != null) continue;
+      const actual = dateMap[entry.forecastDates[h]];
+      if (actual != null) {
+        entry.actuals[h] = actual;
+        updated = true;
+      } else {
+        allScored = false;
+      }
+    }
+    // Mark as scored if at least week 1 has actual data
+    if (entry.actuals[0] != null) {
+      entry.scored = true;
+      updated = true;
+    }
+  }
+  if (updated) saveJournal();
+}
+
+// Calculate journal performance stats
+function getJournalStats() {
+  const scored = adjustmentJournal.filter(e => e.scored && e.actuals[0] != null);
+  if (scored.length === 0) return null;
+
+  let modelBetter = 0, adjBetter = 0, tie = 0;
+  let totalModelErr = 0, totalAdjErr = 0;
+  let byType = {};
+
+  for (const entry of scored) {
+    for (let h = 0; h < FC_WEEKS; h++) {
+      if (entry.actuals[h] == null) continue;
+      const modelErr = Math.abs(entry.modelEnsemble[h] - entry.actuals[h]);
+      const adjErr = Math.abs(entry.adjustedEnsemble[h] - entry.actuals[h]);
+      totalModelErr += modelErr;
+      totalAdjErr += adjErr;
+      if (adjErr < modelErr) adjBetter++;
+      else if (modelErr < adjErr) modelBetter++;
+      else tie++;
+
+      if (!byType[entry.adjType]) byType[entry.adjType] = {modelErr: 0, adjErr: 0, count: 0};
+      byType[entry.adjType].modelErr += modelErr;
+      byType[entry.adjType].adjErr += adjErr;
+      byType[entry.adjType].count++;
+    }
+  }
+
+  const totalComparisons = modelBetter + adjBetter + tie;
+  return {
+    totalEntries: scored.length,
+    totalComparisons,
+    adjBetterPct: totalComparisons > 0 ? (adjBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    modelBetterPct: totalComparisons > 0 ? (modelBetter / totalComparisons * 100).toFixed(1) : '0.0',
+    avgModelMAE: totalComparisons > 0 ? (totalModelErr / totalComparisons) : 0,
+    avgAdjMAE: totalComparisons > 0 ? (totalAdjErr / totalComparisons) : 0,
+    improvement: totalModelErr > 0 ? ((totalModelErr - totalAdjErr) / totalModelErr * 100).toFixed(1) : '0.0',
+    byType
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════
+const logEl = document.getElementById('log-wrap');
+function log(m, t='') {
+  const c = t==='ok' ? 'log-ok' : t==='warn' ? 'log-warn' : t==='err' ? 'log-err' : '';
+  logEl.innerHTML += `<div class="${c}">[${new Date().toLocaleTimeString()}] ${m}</div>`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setLoader(p, m) {
+  document.getElementById('loader-fill').style.width = p + '%';
+  document.getElementById('loader-status').textContent = m;
+}
+function setStatus(s, t) {
+  const el = document.getElementById('status-pill');
+  el.className = 'status-pill ' + s;
+  el.textContent = t;
+}
+
+function fmtVal(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return (v/1e3).toFixed(1) + 'k';
+  if (a >= 1) return v.toFixed(1);
+  return v.toFixed(2);
+}
+function fmtChg(v) {
+  const sign = v >= 0 ? '+' : '';
+  const a = Math.abs(v);
+  if (a >= 1e6) return sign + (v/1e6).toFixed(1) + 'M';
+  if (a >= 1e3) return sign + (v/1e3).toFixed(1) + 'k';
+  if (a >= 1) return sign + v.toFixed(1);
+  return sign + v.toFixed(2);
+}
+function yTickFmt(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v/1e6).toFixed(0) + 'M';
+  if (a >= 1e4) return (v/1e3).toFixed(0) + 'k';
+  if (a >= 1e3) return (v/1e3).toFixed(1) + 'k';
+  return v.toFixed(0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FETCH WITH TIMEOUT + CACHE
+// ═══════════════════════════════════════════════════════════
+const cache = {};
+async function tfetch(url, timeout=TIMEOUT) {
+  if (cache[url]) return cache[url];
+  const ac = new AbortController();
+  const tm = setTimeout(() => ac.abort(), timeout);
+  try {
+    const r = await fetch(url, {signal: ac.signal});
+    clearTimeout(tm);
+    if (!r.ok) { log(`HTTP ${r.status}`, 'warn'); return null; }
+    const j = await r.json();
+    cache[url] = j;
+    return j;
+  } catch(e) {
+    clearTimeout(tm);
+    if (e.name === 'AbortError') log(`Timeout (${timeout/1000}s)`, 'warn');
+    else log(`Fetch error: ${e.message}`, 'warn');
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATA SERVICE
+// ═══════════════════════════════════════════════════════════
+function sdate() {
+  const d = new Date(); d.setFullYear(d.getFullYear() - HIST_YEARS);
+  return d.toISOString().split('T')[0];
+}
+
+function stocUrl(productCode) {
+  let u = `${BASE}/petroleum/stoc/wstk/data/?api_key=${API_KEY}`;
+  u += `&frequency=weekly&data[0]=value&sort[0][column]=period&sort[0][direction]=desc`;
+  u += `&start=${sdate()}&length=5000&facets[product][]=${productCode}`;
+  PADDS.forEach(a => u += `&facets[duoarea][]=${a}`);
+  return u;
+}
+
+
+function extractSeries(resp, area) {
+  if (!resp?.response?.data) return [];
+  return resp.response.data
+    .filter(d => d.duoarea === area && d.value != null)
+    .map(d => ({date: d.period, value: parseFloat(d.value)}))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ═══════════════════════════════════════════════════════════
+// S&D DATA FETCHERS (v4 — from gasoline_dashboard)
+// ═══════════════════════════════════════════════════════════
+function sdStore(cat, pk, area, arr) {
+  const key = cat + '_' + pk + '_' + area;
+  const deduped = [];
+  const seen = new Set();
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (!seen.has(arr[i].period)) { seen.add(arr[i].period); deduped.unshift(arr[i]); }
+  }
+  SD_DATA[key] = deduped;
+}
+
+function sdBucket(raw, prodMap) {
+  const bk = {};
+  raw.forEach(d => {
+    const pk = prodMap[d.product];
+    let area = d.duoarea || null;
+    if (!pk || !area) return;
+    area = area.replace('-Z00', '');
+    const k = pk + '|' + area;
+    if (!bk[k]) bk[k] = [];
+    const v = parseFloat(d.value);
+    if (!isNaN(v)) bk[k].push({period: d.period, value: v});
+  });
+  Object.values(bk).forEach(a => a.sort((x, y) => x.period.localeCompare(y.period)));
+  return bk;
+}
+
+function sdStoreAll(cat, bk) {
+  Object.keys(bk).forEach(k => {
+    const [pk, area] = k.split('|');
+    sdStore(cat, pk, area, bk[k]);
+  });
+}
+
+async function fetchSDProduction() {
+  const url = `${BASE}/petroleum/pnp/wprodrb/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[process][]=YPR&facets[product][]=EPM0C&facets[product][]=EPM0F&facets[product][]=EPM0R&facets[duoarea][]=NUS&facets[duoarea][]=R10&facets[duoarea][]=R20&facets[duoarea][]=R30&facets[duoarea][]=R40&facets[duoarea][]=R50&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r = await tfetch(url);
+  if (!r?.response?.data) { log('S&D Production: no data', 'warn'); return 0; }
+  const bk = sdBucket(r.response.data, {'EPM0R': 'REFORM', 'EPM0C': 'CONV', 'EPM0F': 'MOGAS'});
+  sdStoreAll('production', bk);
+  const cnt = Object.keys(bk).length;
+  log(`S&D Production: ${cnt} series loaded`, 'ok');
+  return cnt;
+}
+
+async function fetchSDTrade() {
+  const url = `${BASE}/petroleum/move/wkly/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[process][]=EEX&facets[process][]=IM0&facets[product][]=EPM0&facets[product][]=EPM0F&facets[product][]=EPOBGRR&facets[product][]=EPOBGCC&facets[duoarea][]=NUS-Z00&facets[duoarea][]=R10-Z00&facets[duoarea][]=R20-Z00&facets[duoarea][]=R30-Z00&facets[duoarea][]=R40-Z00&facets[duoarea][]=R50-Z00&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r = await tfetch(url);
+  if (!r?.response?.data) { log('S&D Trade: no data', 'warn'); return 0; }
+  const bk = {};
+  r.response.data.forEach(d => {
+    const prod = d.product, proc = d.process;
+    let area = (d.duoarea || '').replace('-Z00', '');
+    if (!area) return;
+    let pk = null;
+    if (prod === 'EPOBGRR' && proc === 'IM0') pk = 'RBOB_IMP';
+    else if (prod === 'EPOBGCC' && proc === 'IM0') pk = 'CBOB_IMP';
+    else if (prod === 'EPM0' && proc === 'IM0') pk = 'GAS_IMP';
+    else if (prod === 'EPM0F' && proc === 'EEX') pk = 'MOGAS_EXP';
+    else if (prod === 'EPM0' && proc === 'EEX') pk = 'GAS_EXP';
+    if (!pk) return;
+    const k = pk + '|' + area;
+    if (!bk[k]) bk[k] = [];
+    const v = parseFloat(d.value);
+    if (!isNaN(v)) bk[k].push({period: d.period, value: v});
+  });
+  Object.values(bk).forEach(a => a.sort((x, y) => x.period.localeCompare(y.period)));
+  sdStoreAll('trade', bk);
+  const cnt = Object.keys(bk).length;
+  log(`S&D Trade: ${cnt} series loaded`, 'ok');
+  return cnt;
+}
+
+async function fetchSDRefinery() {
+  // Gasoline blender inputs (RBOB + CBOB)
+  const url1 = `${BASE}/petroleum/pnp/wiup/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[process][]=YIR&facets[product][]=EPOBGCC&facets[product][]=EPOBGRR&facets[duoarea][]=NUS&facets[duoarea][]=R10&facets[duoarea][]=R20&facets[duoarea][]=R30&facets[duoarea][]=R40&facets[duoarea][]=R50&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r1 = await tfetch(url1);
+  let cnt = 0;
+  if (r1?.response?.data) {
+    const bk = {};
+    r1.response.data.forEach(d => {
+      const prod = d.product, area = d.duoarea;
+      if (!area) return;
+      let pk = prod === 'EPOBGRR' ? 'RBOB_IN' : prod === 'EPOBGCC' ? 'CBOB_IN' : null;
+      if (!pk) return;
+      const k = pk + '|' + area;
+      if (!bk[k]) bk[k] = [];
+      const v = parseFloat(d.value);
+      if (!isNaN(v)) bk[k].push({period: d.period, value: v});
+    });
+    Object.values(bk).forEach(a => a.sort((x, y) => x.period.localeCompare(y.period)));
+    sdStoreAll('refinery', bk);
+    cnt += Object.keys(bk).length;
+  }
+
+  // Utilization
+  const url2 = `${BASE}/petroleum/pnp/wiup/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[process][]=YUP&facets[duoarea][]=NUS&facets[duoarea][]=R10&facets[duoarea][]=R20&facets[duoarea][]=R30&facets[duoarea][]=R40&facets[duoarea][]=R50&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r2 = await tfetch(url2);
+  if (r2?.response?.data) {
+    const ab = {};
+    r2.response.data.forEach(d => {
+      const area = d.duoarea; if (!area) return;
+      if (!ab[area]) ab[area] = [];
+      const v = parseFloat(d.value);
+      if (!isNaN(v)) ab[area].push({period: d.period, value: v});
+    });
+    Object.keys(ab).forEach(area => {
+      ab[area].sort((a, b) => a.period.localeCompare(b.period));
+      sdStore('refinery', 'UTIL', area, ab[area]);
+      cnt++;
+    });
+  }
+
+  // Crude inputs
+  const url3 = `${BASE}/petroleum/pnp/wiup/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[series][]=WCRRIP12&facets[series][]=WCRRIP22&facets[series][]=WCRRIP32&facets[series][]=WCRRIP42&facets[series][]=WCRRIP52&facets[series][]=WCRRIUS2&facets[duoarea][]=NUS&facets[duoarea][]=R10&facets[duoarea][]=R20&facets[duoarea][]=R30&facets[duoarea][]=R40&facets[duoarea][]=R50&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r3 = await tfetch(url3);
+  if (r3?.response?.data) {
+    const ab = {};
+    r3.response.data.forEach(d => {
+      const area = d.duoarea; if (!area) return;
+      if (!ab[area]) ab[area] = [];
+      const v = parseFloat(d.value);
+      if (!isNaN(v)) ab[area].push({period: d.period, value: v});
+    });
+    Object.keys(ab).forEach(area => {
+      ab[area].sort((a, b) => a.period.localeCompare(b.period));
+      sdStore('refinery', 'CRUDE_IN', area, ab[area]);
+      cnt++;
+    });
+  }
+  log(`S&D Refinery: ${cnt} series loaded`, 'ok');
+  return cnt;
+}
+
+async function fetchSDDemand() {
+  const url = `${BASE}/petroleum/cons/wpsup/data/?api_key=${API_KEY}&frequency=weekly&data[0]=value&facets[process][]=VPP&facets[product][]=EPM0F&facets[duoarea][]=NUS&facets[duoarea][]=R10&facets[duoarea][]=R20&facets[duoarea][]=R30&facets[duoarea][]=R40&facets[duoarea][]=R50&sort[0][column]=period&sort[0][direction]=desc&offset=0&length=5000`;
+  const r = await tfetch(url);
+  if (!r?.response?.data) { log('S&D Demand: no data', 'warn'); return 0; }
+  const bk = {};
+  r.response.data.forEach(d => {
+    const area = d.duoarea; if (!area) return;
+    if (!bk[area]) bk[area] = [];
+    const v = parseFloat(d.value);
+    if (!isNaN(v)) bk[area].push({period: d.period, value: v});
+  });
+  let cnt = 0;
+  Object.keys(bk).forEach(area => {
+    bk[area].sort((a, b) => a.period.localeCompare(b.period));
+    sdStore('demand', 'MOGAS', area, bk[area]);
+    cnt++;
+  });
+  const nusCount = bk['NUS'] ? bk['NUS'].length : 0;
+  log(`S&D Demand: ${cnt} regions, ${nusCount} NUS points`, 'ok');
+  return cnt;
+}
+
+// Get an SD series aligned to stock dates — returns array of values aligned by date
+function alignSD(sdKey, stockDates) {
+  const sd = SD_DATA[sdKey];
+  if (!sd || sd.length < 10) return null;
+  const map = {};
+  sd.forEach(d => map[d.period] = d.value);
+  const result = [];
+  let ptr = 0, lastVal = null;
+  for (const date of stockDates) {
+    if (map[date] != null) {
+      result.push(map[date]);
+      lastVal = map[date];
+      while (ptr < sd.length && sd[ptr].period <= date) ptr++;
+    } else {
+      while (ptr < sd.length && sd[ptr].period <= date) {
+        lastVal = sd[ptr].value;
+        ptr++;
+      }
+      result.push(lastVal);
+    }
+  }
+  return result;
+}
+
+// Estimate PADD-level demand using production share (better proxy than stocks).
+// Production correlates more closely with regional consumption patterns.
+// Falls back to stock share if production data unavailable.
+function estimatePaddDemand(padd, stockDates, paddSeries) {
+  const nationalDemand = alignSD('demand_MOGAS_NUS', stockDates);
+  if (!nationalDemand) return null;
+
+  const app = window.__app;
+  if (!app || !app.rawData) return null;
+
+  // Try production-based share first (better proxy for demand)
+  const paddProd = alignSD(`production_MOGAS_${padd}`, stockDates) ||
+                   alignSD(`production_REFORM_${padd}`, stockDates);
+  const nusProd = alignSD('production_MOGAS_NUS', stockDates) ||
+                  alignSD('production_REFORM_NUS', stockDates);
+
+  const SHARE_WINDOW = 26;
+
+  if (paddProd && nusProd) {
+    const shares = [];
+    for (let i = Math.max(0, paddProd.length - SHARE_WINDOW); i < paddProd.length; i++) {
+      if (paddProd[i] != null && nusProd[i] != null && nusProd[i] > 0 && paddProd[i] > 0) {
+        shares.push(paddProd[i] / nusProd[i]);
+      }
+    }
+    if (shares.length >= 5) {
+      const avgShare = shares.reduce((a, b) => a + b, 0) / shares.length;
+      return nationalDemand.map(v => v != null ? v * avgShare : null);
+    }
+  }
+
+  // Fallback: stock-based share
+  const nusRaw = app.rawData[PRODUCT_KEY];
+  if (!nusRaw) return null;
+  const nusSeries = extractSeries(nusRaw, 'NUS');
+  if (!nusSeries || nusSeries.length < 52) return null;
+
+  const nusMap = {};
+  nusSeries.forEach(d => nusMap[d.date] = d.value);
+
+  const shares = [];
+  for (let i = Math.max(0, paddSeries.length - SHARE_WINDOW); i < paddSeries.length; i++) {
+    const nusVal = nusMap[paddSeries[i].date];
+    if (nusVal && nusVal > 0 && paddSeries[i].value > 0) {
+      shares.push(paddSeries[i].value / nusVal);
+    }
+  }
+  if (shares.length < 10) return null;
+
+  const avgShare = shares.reduce((a, b) => a + b, 0) / shares.length;
+  return nationalDemand.map(v => v != null ? v * avgShare : null);
+}
+
+function combineImports(padd, stockDates) {
+  const rbob = alignSD(`trade_RBOB_IMP_${padd}`, stockDates);
+  const cbob = alignSD(`trade_CBOB_IMP_${padd}`, stockDates);
+  if (!rbob && !cbob) return null;
+  if (!rbob) return cbob;
+  if (!cbob) return rbob;
+  return rbob.map((v, i) => (v || 0) + (cbob[i] || 0));
+}
+
+// Build S&D features object for a given PADD
+function buildSDFeatures(padd, stockDates, paddSeries) {
+  const sdF = {};
+  // Production — MOGAS > REFORM > CONV (conventional gasoline)
+  sdF.production = alignSD(`production_MOGAS_${padd}`, stockDates) ||
+                   alignSD(`production_REFORM_${padd}`, stockDates) ||
+                   alignSD(`production_CONV_${padd}`, stockDates);
+
+  // Imports — total gas imports, with RBOB+CBOB fallback
+  sdF.imports = alignSD(`trade_GAS_IMP_${padd}`, stockDates) ||
+                combineImports(padd, stockDates) ||
+                alignSD(`trade_RBOB_IMP_${padd}`, stockDates);
+
+  // Exports — finished mogas > total gas exports
+  sdF.exports = alignSD(`trade_MOGAS_EXP_${padd}`, stockDates) ||
+                alignSD(`trade_GAS_EXP_${padd}`, stockDates);
+
+  // Demand — use direct PADD data if available, otherwise estimate
+  sdF.demand = alignSD(`demand_MOGAS_${padd}`, stockDates);
+  if (!sdF.demand && padd !== 'NUS') {
+    sdF.demand = estimatePaddDemand(padd, stockDates, paddSeries);
+  }
+
+  // Utilization
+  sdF.utilization = alignSD(`refinery_UTIL_${padd}`, stockDates);
+
+  // Crude inputs
+  sdF.crudeInputs = alignSD(`refinery_CRUDE_IN_${padd}`, stockDates);
+
+  // Blender inputs
+  sdF.rbobInputs = alignSD(`refinery_RBOB_IN_${padd}`, stockDates);
+  sdF.cbobInputs = alignSD(`refinery_CBOB_IN_${padd}`, stockDates);
+
+  return sdF;
+}
+
+function countSDFeatures(sdF) {
+  return Object.values(sdF).filter(v => v != null).length;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// MODELS (v5 — optimized ensemble + regime detection)
+// ═══════════════════════════════════════════════════════════
+function weekOfYear(ds) {
+  const d = new Date(ds), s = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil(((d - s) / 864e5 + s.getDay() + 1) / 7);
+}
+
+// ─── Regime Detection ───
+// Classifies current market conditions for context-aware weighting
+function detectRegime(series, sdF) {
+  const n = series.length;
+  const lastDate = series[n - 1].date;
+  const wk = weekOfYear(lastDate);
+
+  // Seasonal regime based on gasoline demand cycle
+  let season;
+  if (wk >= 10 && wk <= 24) season = 'draw';       // Mar-Jun: pre-summer drawdowns
+  else if (wk >= 25 && wk <= 36) season = 'peak';   // Jun-Sep: peak demand
+  else if (wk >= 37 && wk <= 46) season = 'build';  // Sep-Nov: restocking
+  else season = 'shoulder';                           // Dec-Feb: winter
+
+  // Volatility: recent 8-week vs trailing 52-week
+  const changes = [];
+  for (let i = Math.max(1, n - 52); i < n; i++) changes.push(series[i].value - series[i - 1].value);
+  const recentCh = changes.slice(-8);
+  const recentVol = recentCh.length > 0 ? Math.sqrt(recentCh.reduce((s, c) => s + c * c, 0) / recentCh.length) : 0;
+  const histVol = changes.length > 0 ? Math.sqrt(changes.reduce((s, c) => s + c * c, 0) / changes.length) : 1;
+  const volRatio = histVol > 0 ? recentVol / histVol : 1;
+  const highVol = volRatio > 1.5;
+
+  // Turnaround detection: sharp utilization drop (>3 pts over 4 weeks)
+  let turnaround = false;
+  if (sdF.utilization) {
+    const util = sdF.utilization;
+    const lastUtil = util[util.length - 1];
+    const prevUtil = util.length > 4 ? util[util.length - 5] : null;
+    if (lastUtil != null && prevUtil != null && (prevUtil - lastUtil) > 3) {
+      turnaround = true;
+    }
+  }
+
+  // Momentum: is stock trend accelerating or decelerating?
+  let momentum = 0;
+  if (n > 8) {
+    const ch4 = series[n - 1].value - series[n - 5].value;
+    const ch4prev = series[n - 5].value - series[Math.max(0, n - 9)].value;
+    momentum = ch4 - ch4prev; // positive = accelerating builds
+  }
+
+  return { season, highVol, turnaround, volRatio, week: wk, momentum };
+}
+
+// Encode regime for meta-learner features (shoulder is reference category)
+function regimeFeatures(regime) {
+  const momScale = 5000;
+  return [
+    regime.season === 'draw' ? 1 : 0,
+    regime.season === 'peak' ? 1 : 0,
+    regime.season === 'build' ? 1 : 0,
+    regime.volRatio,
+    regime.turnaround ? 1 : 0,
+    regime.momentum / momScale
+  ];
+}
+
+// ─── Fallback Model: Weighted Multi-Year Seasonal Average ───
+// Only contributes when S&D data is unavailable
+function seasonalNaive(series, horizon) {
+  const n = series.length;
+  if (n < 104) return null;
+  const results = [];
+  for (let h = 0; h < horizon; h++) {
+    let wSum = 0, vSum = 0;
+    for (let yr = 1; yr <= 5; yr++) {
+      const idx = n - yr * SEASON + h;
+      if (idx >= 0 && idx < n) {
+        const w = Math.pow(0.6, yr - 1);
+        vSum += w * series[idx].value;
+        wSum += w;
+      }
+    }
+    if (wSum > 0) {
+      let trend = 0, tCnt = 0;
+      for (let yr = 1; yr <= 3; yr++) {
+        const i1 = n - yr * SEASON + h;
+        const i0 = n - (yr + 1) * SEASON + h;
+        if (i0 >= 0 && i1 >= 0 && i1 < n && i0 < n) {
+          trend += series[i1].value - series[i0].value;
+          tCnt++;
+        }
+      }
+      trend = tCnt > 0 ? trend / tCnt : 0;
+      results.push(vSum / wSum + trend * 0.5);
+    } else {
+      results.push(series[n - 1].value);
+    }
+  }
+  return results;
+}
+
+// ─── Fallback Model: Holt-Winters ───
+// Only contributes when S&D data is unavailable
+function holtWinters(series, horizon) {
+  const n = series.length;
+  if (n < SEASON * 2) return null;
+  const v = series.map(d => d.value);
+  const gm = v.slice(0, SEASON * 2).reduce((a, b) => a + b, 0) / (SEASON * 2);
+  const sea = Array.from({length: SEASON}, (_, i) => {
+    const s1 = v[i] || 0, s2 = v[i + SEASON] || s1;
+    return (s1 + s2) / 2 - gm;
+  });
+  let bA = .3, bB = .01, bG = .1, bE = Infinity;
+  for (let a = .02; a <= .5; a += .06) {
+    for (let b = .001; b <= .05; b += .008) {
+      for (let g = .01; g <= .3; g += .05) {
+        const e = hwErr(v, a, b, g, [...sea], Math.min(12, Math.floor(n * .08)));
+        if (e < bE) { bE = e; bA = a; bB = b; bG = g; }
+      }
+    }
+  }
+  const s = [...sea];
+  let lv = v.slice(0, SEASON).reduce((a, b) => a + b, 0) / SEASON;
+  let tr = 0;
+  for (let i = 0; i < SEASON && (i + SEASON) < v.length; i++) tr += (v[i + SEASON] - v[i]);
+  tr /= (SEASON * SEASON);
+  for (let t = 0; t < n; t++) {
+    const p = lv, si = t % SEASON;
+    lv = bA * (v[t] - s[si]) + (1 - bA) * (p + tr);
+    tr = bB * (lv - p) + (1 - bB) * tr;
+    s[si] = bG * (v[t] - lv) + (1 - bG) * s[si];
+  }
+  return Array.from({length: horizon}, (_, h) => lv + tr * (h + 1) + s[(n + h) % SEASON]);
+}
+
+function hwErr(v, a, b, g, sea, vw) {
+  const n = v.length;
+  let lv = v.slice(0, SEASON).reduce((a, b) => a + b, 0) / SEASON, tr = 0;
+  for (let i = 0; i < SEASON && (i + SEASON) < v.length; i++) tr += (v[i + SEASON] - v[i]);
+  tr /= (SEASON * SEASON);
+  const s = [...sea], te = n - vw;
+  for (let t = 0; t < te; t++) {
+    const p = lv, si = t % SEASON;
+    lv = a * (v[t] - s[si]) + (1 - a) * (p + tr);
+    tr = b * (lv - p) + (1 - b) * tr;
+    s[si] = g * (v[t] - lv) + (1 - g) * s[si];
+  }
+  let e = 0;
+  for (let h = 1; h <= vw; h++) {
+    if (!v[te + h - 1]) continue;
+    e += Math.abs(lv + tr * h + s[(te + h - 1) % SEASON] - v[te + h - 1]);
+  }
+  return e / vw;
+}
+
+// ─── Primary Model 1: S&D Regression (v5 — feature selection + strong ridge) ───
+// Forward stepwise feature selection keeps only features improving OOS accuracy.
+// Ridge regularization increased from 0.01 → 1.0 to prevent overfitting.
+function sdRegression(series, sdF, horizon) {
+  const n = series.length;
+  if (n < 60) return null;
+  const v = series.map(d => d.value);
+
+  const sdKeys = ['production', 'imports', 'exports', 'demand', 'utilization', 'crudeInputs', 'rbobInputs', 'cbobInputs'];
+
+  // Build ALL candidate features for each training row
+  function buildFeatureRow(t) {
+    const wk = weekOfYear(series[t].date);
+    // Core features (always included): harmonics + momentum
+    const core = [
+      Math.sin(2 * Math.PI * wk / 52),
+      Math.cos(2 * Math.PI * wk / 52),
+      Math.sin(4 * Math.PI * wk / 52),
+      Math.cos(4 * Math.PI * wk / 52),
+      v[t] - v[t - 1],                          // 1-week change
+      v[t] - v[t - 4],                          // 4-week change
+      t >= SEASON ? v[t] - v[t - SEASON] : 0,   // YoY change
+    ];
+    // Candidate S&D features (individually tested)
+    const candidates = [];
+    for (const k of sdKeys) {
+      const arr = sdF[k];
+      if (arr && arr[t] != null) {
+        candidates.push(arr[t]);
+        candidates.push(t > 0 && arr[t - 1] != null ? arr[t] - arr[t - 1] : 0);
+      } else {
+        candidates.push(0);
+        candidates.push(0);
+      }
+    }
+    return { core, candidates };
+  }
+
+  // Build training data
+  const allRows = [], tgts = [];
+  for (let t = Math.max(4, SEASON); t < n - 1; t++) {
+    allRows.push(buildFeatureRow(t));
+    tgts.push(v[t + 1] - v[t]);
+  }
+  if (tgts.length < 30) return null;
+
+  // Split: last 20% for validation
+  const valSize = Math.max(5, Math.floor(tgts.length * 0.2));
+  const trainEnd = tgts.length - valSize;
+
+  // Evaluate a feature set on validation data
+  function evalFeatureSet(featureIndices) {
+    const X_train = [], y_train = [], X_val = [], y_val = [];
+    for (let i = 0; i < trainEnd; i++) {
+      const row = [...allRows[i].core];
+      for (const idx of featureIndices) row.push(allRows[i].candidates[idx]);
+      X_train.push(row);
+      y_train.push(tgts[i]);
+    }
+    for (let i = trainEnd; i < tgts.length; i++) {
+      const row = [...allRows[i].core];
+      for (const idx of featureIndices) row.push(allRows[i].candidates[idx]);
+      X_val.push(row);
+      y_val.push(tgts[i]);
+    }
+    const c = ols(X_train, y_train, SD_RIDGE);
+    if (!c) return Infinity;
+    let err = 0;
+    for (let i = 0; i < X_val.length; i++) {
+      let pred = c[0];
+      for (let j = 0; j < X_val[i].length; j++) pred += c[j + 1] * X_val[i][j];
+      err += Math.abs(pred - y_val[i]);
+    }
+    return err / X_val.length;
+  }
+
+  // Forward stepwise: start with core only, greedily add S&D features
+  const nCandidates = sdKeys.length * 2; // level + WoW for each
+  let bestSet = [];
+  let bestErr = evalFeatureSet([]);
+
+  for (let round = 0; round < nCandidates; round++) {
+    let improved = false;
+    let bestCandidate = -1, bestNewErr = bestErr;
+    for (let c = 0; c < nCandidates; c++) {
+      if (bestSet.includes(c)) continue;
+      const trial = [...bestSet, c];
+      const err = evalFeatureSet(trial);
+      if (err < bestNewErr - 0.001) { // require meaningful improvement
+        bestNewErr = err;
+        bestCandidate = c;
+        improved = true;
+      }
+    }
+    if (improved && bestCandidate >= 0) {
+      bestSet.push(bestCandidate);
+      bestErr = bestNewErr;
+    } else break;
+  }
+
+  // Retrain on ALL data with selected features
+  const X_all = [];
+  for (let i = 0; i < tgts.length; i++) {
+    const row = [...allRows[i].core];
+    for (const idx of bestSet) row.push(allRows[i].candidates[idx]);
+    X_all.push(row);
+  }
+  const c = ols(X_all, tgts, SD_RIDGE);
+  if (!c) return null;
+
+  // Forecast forward
+  const fc = [];
+  const predicted = [...v];
+  let lc = v[n - 1] - v[n - 2];
+
+  for (let h = 1; h <= horizon; h++) {
+    const fd = new Date(series[n - 1].date);
+    fd.setDate(fd.getDate() + 7 * h);
+    const wk = weekOfYear(fd.toISOString().split('T')[0]);
+    const m = predicted.length;
+    const lc4 = m >= 4 ? predicted[m - 1] - predicted[m - 4] : lc * 4;
+    const yoy = m >= SEASON ? predicted[m - 1] - predicted[m - SEASON] : 0;
+    const core = [
+      Math.sin(2 * Math.PI * wk / 52),
+      Math.cos(2 * Math.PI * wk / 52),
+      Math.sin(4 * Math.PI * wk / 52),
+      Math.cos(4 * Math.PI * wk / 52),
+      lc, lc4, yoy,
+    ];
+    const candidates = [];
+    for (const k of sdKeys) {
+      const arr = sdF[k];
+      if (arr && arr.length > 0) {
+        const idx1 = Math.min(arr.length - 1, arr.length - 1);
+        const idx2 = Math.max(0, arr.length - 1 - h);
+        const curVal = arr[idx1] != null ? arr[idx1] : 0;
+        const lagVal = arr[idx2] != null ? arr[idx2] : curVal;
+        candidates.push(curVal);
+        candidates.push(curVal - lagVal);
+      } else {
+        candidates.push(0);
+        candidates.push(0);
+      }
+    }
+    const f = [...core];
+    for (const idx of bestSet) f.push(candidates[idx]);
+
+    let p = c[0];
+    for (let j = 0; j < f.length; j++) p += c[j + 1] * f[j];
+    predicted.push(predicted[m - 1] + p);
+    lc = p;
+    fc.push(predicted[predicted.length - 1]);
+  }
+  return fc;
+}
+
+// ─── Primary Model 2: S&D Balance (v5 — seasonally aware) ───
+// Uses same-week-last-year S&D component values for seasonal projection
+// instead of simple linear trend extrapolation.
+function sdBalanceModel(series, sdF, horizon) {
+  const n = series.length;
+  if (n < 30) return null;
+  const v = series.map(d => d.value);
+
+  const prod = sdF.production, imp = sdF.imports, exp = sdF.exports, dem = sdF.demand;
+  // Need at least 2 S&D components for a meaningful balance
+  const availableComponents = [prod, imp, exp, dem].filter(c => c != null).length;
+  if (availableComponents < 2) return null;
+
+  // Calibration: S&D balance vs actual stock change (last 26 weeks)
+  const calWindow = Math.min(26, n - 1);
+  let sumBalChg = 0, sumActChg = 0, calCnt = 0;
+  for (let t = n - calWindow; t < n; t++) {
+    if (t < 1) continue;
+    let bal = 0, hasBal = false;
+    if (prod && prod[t] != null) { bal += prod[t]; hasBal = true; }
+    if (imp && imp[t] != null) { bal += imp[t]; hasBal = true; }
+    if (exp && exp[t] != null) { bal -= exp[t]; hasBal = true; }
+    if (dem && dem[t] != null) { bal -= dem[t]; hasBal = true; }
+    if (hasBal) {
+      sumBalChg += bal * 7;
+      sumActChg += v[t] - v[t - 1];
+      calCnt++;
+    }
+  }
+  if (calCnt < 10) return null;
+
+  const avgBal = sumBalChg / calCnt;
+  const avgAct = sumActChg / calCnt;
+  const scale = avgBal !== 0 ? avgAct / avgBal : 1;
+
+  // Seasonal projection: use same-week-last-year S&D values as baseline,
+  // then adjust by recent deviation from seasonal norm
+  function getSeasonalProjection(arr, h) {
+    if (!arr) return null;
+    const latest = arr[arr.length - 1];
+    if (latest == null) return null;
+
+    // Find same-week-last-year value
+    const targetIdx = arr.length - SEASON + h;
+    const lyVal = targetIdx >= 0 && targetIdx < arr.length && arr[targetIdx] != null
+      ? arr[targetIdx] : null;
+
+    if (lyVal == null) {
+      // Fallback: linear trend (4-week)
+      const recent = [];
+      for (let t = Math.max(0, arr.length - 8); t < arr.length; t++) {
+        if (arr[t] != null) recent.push(arr[t]);
+      }
+      if (recent.length < 4) return latest;
+      const half = Math.floor(recent.length / 2);
+      const first = recent.slice(0, half).reduce((a, b) => a + b, 0) / half;
+      const second = recent.slice(half).reduce((a, b) => a + b, 0) / (recent.length - half);
+      return latest + (second - first) / half * h;
+    }
+
+    // Same-week-last-year value, adjusted by recent deviation
+    // deviation = how much current level differs from year-ago level
+    const lyLatest = arr.length - SEASON >= 0 ? arr[arr.length - SEASON] : null;
+    const deviation = lyLatest != null ? latest - lyLatest : 0;
+
+    // Project: last year's seasonal pattern + current deviation (with decay)
+    const lyNext = targetIdx + 1 < arr.length && arr[targetIdx + 1] != null
+      ? arr[targetIdx + 1] : lyVal;
+    const lyTrend = lyNext - lyVal;
+
+    return lyVal + deviation + lyTrend * 0.3;
+  }
+
+  // Project forward
+  const fc = [];
+  let last = v[n - 1];
+  for (let h = 1; h <= horizon; h++) {
+    const p = getSeasonalProjection(prod, h) || (prod ? prod[prod.length - 1] || 0 : 0);
+    const i = getSeasonalProjection(imp, h) || (imp ? imp[imp.length - 1] || 0 : 0);
+    const e = getSeasonalProjection(exp, h) || (exp ? exp[exp.length - 1] || 0 : 0);
+    const d = getSeasonalProjection(dem, h) || (dem ? dem[dem.length - 1] || 0 : 0);
+    const bal = (p + i - e - d) * 7;
+    last += bal * scale;
+    fc.push(last);
+  }
+  return fc;
+}
+
+// ─── Primary Model 3: AR(6) Autoregressive ───
+// Pure autoregressive: lags 1-6 + seasonal lag (52). Unchanged from v4.
+function arModel(series, horizon) {
+  const n = series.length;
+  if (n < SEASON + 10) return null;
+  const v = series.map(d => d.value);
+  const P = 6;
+
+  const rows = [], tgts = [];
+  for (let t = SEASON; t < n; t++) {
+    const f = [];
+    for (let lag = 1; lag <= P; lag++) f.push(v[t - lag]);
+    f.push(v[t - SEASON]);
+    rows.push(f);
+    tgts.push(v[t]);
+  }
+  if (tgts.length < 30) return null;
+  const c = ols(rows, tgts, 0.01); // AR uses lighter ridge
+  if (!c) return null;
+
+  const extended = [...v];
+  for (let h = 0; h < horizon; h++) {
+    const m = extended.length;
+    const f = [];
+    for (let lag = 1; lag <= P; lag++) f.push(extended[m - lag]);
+    f.push(m - SEASON >= 0 ? extended[m - SEASON] : extended[m - 1]);
+    let pred = c[0];
+    for (let j = 0; j < f.length; j++) pred += c[j + 1] * f[j];
+    extended.push(pred);
+  }
+  return extended.slice(n);
+}
+
+// ─── OLS Solver (v5 — configurable ridge) ───
+function ols(X, y, ridge) {
+  if (ridge == null) ridge = SD_RIDGE;
+  const n = X.length, p = X[0].length, pp = p + 1;
+  const Xa = X.map(r => [1, ...r]);
+  const XtX = Array.from({length: pp}, () => new Array(pp).fill(0));
+  const Xty = new Array(pp).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < pp; j++) {
+      Xty[j] += Xa[i][j] * y[i];
+      for (let k = 0; k < pp; k++) XtX[j][k] += Xa[i][j] * Xa[i][k];
+    }
+  }
+  for (let j = 1; j < pp; j++) XtX[j][j] += ridge;
+  const aug = XtX.map((r, i) => [...r, Xty[i]]);
+  for (let c = 0; c < pp; c++) {
+    let mr = c;
+    for (let r = c + 1; r < pp; r++) {
+      if (Math.abs(aug[r][c]) > Math.abs(aug[mr][c])) mr = r;
+    }
+    [aug[c], aug[mr]] = [aug[mr], aug[c]];
+    if (Math.abs(aug[c][c]) < 1e-10) return null;
+    for (let r = c + 1; r < pp; r++) {
+      const f = aug[r][c] / aug[c][c];
+      for (let j = c; j <= pp; j++) aug[r][j] -= f * aug[c][j];
+    }
+  }
+  const co = new Array(pp);
+  for (let i = pp - 1; i >= 0; i--) {
+    co[i] = aug[i][pp];
+    for (let j = i + 1; j < pp; j++) co[i] -= aug[i][j] * co[j];
+    co[i] /= aug[i][i];
+  }
+  return co;
+}
+
+// ─── Weight Cache ───
+const WEIGHT_CACHE = new Map();
+function weightCacheKey(series) {
+  const lastDate = series[series.length - 1].date;
+  const lastVal = series[series.length - 1].value;
+  return PRODUCT_KEY + '_' + lastDate + '_' + series.length + '_' + lastVal;
+}
+
+// ─── Stacked Meta-Learner ───
+// Learns WHEN each model performs well using backtest predictions + regime context.
+// Trains a small ridge regression: [model_preds, regime_features] → actual
+function trainMetaLearner(series, sdF, targetHorizon) {
+  if (!targetHorizon) targetHorizon = 1;
+  const n = series.length;
+  const vw = Math.min(META_VAL_WEEKS, Math.floor(n * 0.15));
+  if (vw < 8) return null;
+
+  const metaX = [], metaY = [];
+  for (let w = 1; w <= vw; w++) {
+    const endIdx = n - vw + w - targetHorizon;
+    const sub = series.slice(0, endIdx);
+    if (sub.length < SEASON * 2) continue;
+    const actIdx = endIdx + targetHorizon - 1;
+    if (actIdx >= n) continue;
+    const act = series[actIdx].value;
+
+    const sdSub = {};
+    for (const k of Object.keys(sdF)) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, endIdx);
+    }
+
+    try {
+      const m1 = sdRegression(sub, sdSub, targetHorizon);
+      const m2 = sdBalanceModel(sub, sdSub, targetHorizon);
+      const m3 = arModel(sub, targetHorizon);
+
+      if (!m1 || !m2 || !m3) continue;
+
+      const regime = detectRegime(sub, sdSub);
+      const rf = regimeFeatures(regime);
+
+      metaX.push([m1[targetHorizon - 1], m2[targetHorizon - 1], m3[targetHorizon - 1], ...rf]);
+      metaY.push(act);
+    } catch(e) { /* skip */ }
+  }
+
+  if (metaX.length < 5) return null;
+
+  const p = metaX[0].length;
+  const mean = new Array(p).fill(0);
+  const sd = new Array(p).fill(0);
+  for (const row of metaX) for (let j = 0; j < p; j++) mean[j] += row[j];
+  for (let j = 0; j < p; j++) mean[j] /= metaX.length;
+  for (const row of metaX) for (let j = 0; j < p; j++) sd[j] += (row[j] - mean[j]) ** 2;
+  for (let j = 0; j < p; j++) sd[j] = Math.sqrt(sd[j] / metaX.length) || 1;
+
+  const normX = metaX.map(row => row.map((v, j) => (v - mean[j]) / sd[j]));
+
+  const c = ols(normX, metaY, 0.5);
+  if (!c) return null;
+
+  return { coeffs: c, nFeatures: p, nSamples: metaX.length, mean, sd };
+}
+
+function applyMetaLearner(metaModel, rawFeatures) {
+  let val = metaModel.coeffs[0];
+  for (let j = 0; j < rawFeatures.length; j++) {
+    const normed = (rawFeatures[j] - metaModel.mean[j]) / metaModel.sd[j];
+    val += metaModel.coeffs[j + 1] * normed;
+  }
+  return val;
+}
+
+// ─── Ensemble Engine (v5 — regime-aware meta-learner) ───
+function runEnsemble(series, sdF, horizon, quiet) {
+  const regime = detectRegime(series, sdF);
+  const hasSdData = countSDFeatures(sdF) >= 3;
+
+  const m1 = sdRegression(series, sdF, horizon);
+  const m2 = sdBalanceModel(series, sdF, horizon);
+  const m3 = arModel(series, horizon);
+
+  const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+  const needFallback = !hasSdData || primaryCount < 2;
+  const m4 = needFallback ? seasonalNaive(series, horizon) : null;
+  const m5 = needFallback ? holtWinters(series, horizon) : null;
+
+  const models = [m1, m2, m3, m4, m5];
+  const names = ['S&D Reg', 'S&D Balance', 'AR Model', 'Seasonal*', 'Holt-Win*'];
+  const activeCount = models.filter(m => m !== null).length;
+
+  const cacheKey = weightCacheKey(series);
+  const metaModels = [];
+  for (let h = 1; h <= horizon; h++) {
+    const mk = cacheKey + '_meta_h' + h;
+    let mm = WEIGHT_CACHE.get(mk);
+    if (!mm) {
+      mm = trainMetaLearner(series, sdF, h);
+      if (mm) WEIGHT_CACHE.set(mk, mm);
+    }
+    metaModels.push(mm);
+  }
+
+  let w = WEIGHT_CACHE.get(cacheKey + '_weights');
+  if (!w) {
+    w = calcWeights(series, sdF, needFallback);
+    WEIGHT_CACHE.set(cacheKey + '_weights', w);
+  }
+
+  if (!quiet) {
+    const wParts = w.map((wt, i) => `${names[i]}:${(wt * 100).toFixed(0)}%`).filter((_, i) => models[i] !== null).join(' ');
+    log(`Regime: ${regime.season} | Vol: ${regime.volRatio.toFixed(2)}x${regime.turnaround ? ' | TURNAROUND' : ''}`);
+    log(`Ensemble weights — ${wParts} (${activeCount}/${NUM_MODELS} active${needFallback ? ', +fallbacks' : ''})${metaModel ? ' [meta-learner active]' : ''}`);
+  }
+
+  const fc = [];
+  for (let h = 0; h < horizon; h++) {
+    let val;
+    // Try meta-learner for this horizon step
+    const hMeta = metaModels[h];
+    if (hMeta && hMeta.mean && m1 && m2 && m3) {
+      const rf = regimeFeatures(regime);
+      const metaFeatures = [m1[h], m2[h], m3[h], ...rf];
+      val = applyMetaLearner(hMeta, metaFeatures);
+
+      const modelOutputs = [m1[h], m2[h], m3[h]].filter(v => v != null);
+      const mn = Math.min(...modelOutputs), mx = Math.max(...modelOutputs);
+      const range = mx - mn;
+      if (val < mn - range * 0.5 || val > mx + range * 0.5) {
+        val = null;
+      }
+    }
+
+    if (val == null) {
+      // Weighted average fallback
+      let ws = 0, vs = 0;
+      for (let i = 0; i < NUM_MODELS; i++) {
+        if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+      }
+      val = ws > 0 ? vs / ws : series[series.length - 1].value;
+    }
+    fc.push(val);
+  }
+
+  const ci = calcCI(series, sdF);
+  return {
+    ensemble: fc,
+    sdReg: m1 || fc,
+    sdBalance: m2 || fc,
+    arModel: m3 || fc,
+    sdRegRaw: m1,
+    sdBalanceRaw: m2,
+    arModelRaw: m3,
+    seasonal: m4 || (needFallback ? fc : null),
+    holtWinters: m5 || (needFallback ? fc : null),
+    weights: w,
+    ciLow: ci.low,
+    ciHigh: ci.high,
+    metrics: ci.metrics,
+    activeCount,
+    sdFeatureCount: countSDFeatures(sdF),
+    regime,
+    hasMeta: metaModels.some(m => m),
+    metaCoeffs: metaModels[0] ? metaModels[0].coeffs : null,
+    metaNSamples: metaModels[0] ? metaModels[0].nSamples : 0,
+    metaNFeatures: metaModels[0] ? metaModels[0].nFeatures : 0,
+    needFallback
+  };
+}
+
+// v5: Weight calculation with exponential decay + optional fallback models
+function calcWeights(series, sdF, includeFallback) {
+  const n = series.length;
+  const vw = Math.min(VAL_WEEKS, Math.floor(n * 0.1));
+  const defaultW = includeFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0];
+  if (vw < 3) return defaultW;
+
+  const errs = new Array(NUM_MODELS).fill(0);
+  const cnts = new Array(NUM_MODELS).fill(0);
+  for (let w = 1; w <= vw; w++) {
+    const sub = series.slice(0, n - vw + w - 1);
+    const act = series[n - vw + w - 1].value;
+    const sdSub = {};
+    for (const k of Object.keys(sdF)) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, n - vw + w - 1);
+    }
+    // Exponential decay: more recent validation weeks get higher weight
+    const decay = Math.pow(0.95, vw - w); // most recent = full weight, older = decayed
+
+    const m = [
+      sdRegression(sub, sdSub, 1),
+      sdBalanceModel(sub, sdSub, 1),
+      arModel(sub, 1),
+      includeFallback ? seasonalNaive(sub, 1) : null,
+      includeFallback ? holtWinters(sub, 1) : null,
+    ];
+    for (let i = 0; i < NUM_MODELS; i++) {
+      if (m[i]) { errs[i] += Math.abs(m[i][0] - act) * decay; cnts[i] += decay; }
+    }
+  }
+  const maes = errs.map((e, i) => cnts[i] > 0 ? e / cnts[i] : Infinity);
+  const inv = maes.map(m => m > 0 && isFinite(m) ? 1 / m : 0);
+  const tot = inv.reduce((a, b) => a + b, 0);
+  return tot === 0 ? defaultW : inv.map(v => v / tot);
+}
+
+// v5: CI based on 52-week backtest window (expanded from 20)
+function calcCI(series, sdF) {
+  const n = series.length;
+  const ciWindow = Math.min(CI_WEEKS, Math.floor(n * 0.25));
+
+  // Collect actual ensemble prediction errors at each horizon
+  const horizonErrors = Array.from({length: FC_WEEKS}, () => []);
+  for (let w = FC_WEEKS; w <= ciWindow; w++) {
+    const sub = series.slice(0, n - ciWindow + w - FC_WEEKS);
+    const sdSub = {};
+    for (const k of Object.keys(sdF)) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, n - ciWindow + w - FC_WEEKS);
+    }
+    try {
+      const fc = runEnsembleRaw(sub, sdSub, FC_WEEKS);
+      for (let h = 0; h < FC_WEEKS; h++) {
+        const actIdx = n - ciWindow + w - FC_WEEKS + h;
+        if (actIdx < n && fc[h] != null) {
+          horizonErrors[h].push(fc[h] - series[actIdx].value);
+        }
+      }
+    } catch(e) { /* skip */ }
+  }
+
+  // Fallback: change std
+  const ch = [];
+  for (let i = 1; i < n; i++) ch.push(series[i].value - series[i - 1].value);
+  let std = 0;
+  if (ch.length > 0) {
+    const mn = ch.reduce((a, b) => a + b, 0) / ch.length;
+    std = Math.sqrt(ch.reduce((a, b) => a + (b - mn) ** 2, 0) / ch.length);
+  }
+
+  const low = [], high = [];
+  for (let h = 0; h < FC_WEEKS; h++) {
+    const errs = horizonErrors[h];
+    if (errs.length >= 5) {
+      errs.sort((a, b) => a - b);
+      const lo = errs[Math.floor((errs.length - 1) * 0.1)];
+      const hi = errs[Math.floor((errs.length - 1) * 0.9)];
+      low.push(lo);
+      high.push(hi);
+    } else {
+      const s = 1.28 * std * Math.sqrt(h + 1);
+      low.push(-s);
+      high.push(s);
+    }
+  }
+
+  // Metrics: backtest ensemble accuracy — uses same pipeline as Backtest tab
+  const metricWindow = Math.min(CI_WEEKS, Math.floor(n * 0.25));
+  let mape = 0, mae = 0, dOk = 0, dN = 0, mCnt = 0;
+  const METRIC_RETRAIN_INTERVAL = 8;
+  let mMeta = null, mWeights = null, mSteps = METRIC_RETRAIN_INTERVAL;
+  for (let w = 1; w <= metricWindow; w++) {
+    const sub = series.slice(0, n - metricWindow + w - 1);
+    if (sub.length < SEASON * 2) continue;
+    const act = series[n - metricWindow + w - 1].value;
+    const sdSub = {};
+    for (const k of Object.keys(sdF)) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, n - metricWindow + w - 1);
+    }
+    if (mSteps >= METRIC_RETRAIN_INTERVAL) {
+      const hasSd = countSDFeatures(sdSub) >= 3;
+      mWeights = calcWeights(sub, sdSub, !hasSd);
+      mMeta = trainMetaLearner(sub, sdSub);
+      mSteps = 0;
+    }
+    mSteps++;
+    try {
+      const regime = detectRegime(sub, sdSub);
+      const m1 = sdRegression(sub, sdSub, 1);
+      const m2 = sdBalanceModel(sub, sdSub, 1);
+      const m3 = arModel(sub, 1);
+      const hasSdData = countSDFeatures(sdSub) >= 3;
+      const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+      const needFb = !hasSdData || primaryCount < 2;
+      const m4 = needFb ? seasonalNaive(sub, 1) : null;
+      const m5 = needFb ? holtWinters(sub, 1) : null;
+      const models = [m1, m2, m3, m4, m5];
+      const wt = mWeights || (needFb ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+      let pred = null;
+      if (mMeta && mMeta.mean && m1 && m2 && m3) {
+        const rf = regimeFeatures(regime);
+        const mf = [m1[0], m2[0], m3[0], ...rf];
+        pred = applyMetaLearner(mMeta, mf);
+        const mo = [m1[0], m2[0], m3[0]];
+        const mn = Math.min(...mo), mx = Math.max(...mo), range = mx - mn;
+        if (pred < mn - range * 0.5 || pred > mx + range * 0.5) pred = null;
+      }
+      if (pred == null) {
+        let ws = 0, vs = 0;
+        for (let i = 0; i < NUM_MODELS; i++) {
+          if (models[i]) { vs += wt[i] * models[i][0]; ws += wt[i]; }
+        }
+        pred = ws > 0 ? vs / ws : sub[sub.length - 1].value;
+      }
+
+      const e = Math.abs(pred - act);
+      mae += e;
+      if (Math.abs(act) > 0) mape += (e / Math.abs(act)) * 100;
+      mCnt++;
+      const lastKnown = sub[sub.length - 1].value;
+      if ((pred >= lastKnown) === (act >= lastKnown)) dOk++;
+      dN++;
+    } catch(e) { /* skip */ }
+  }
+
+  return {
+    low, high,
+    metrics: {
+      mape: mCnt > 0 ? (mape / mCnt).toFixed(2) + '%' : '—',
+      mae: mCnt > 0 ? fmtVal(mae / mCnt) : '—',
+      dirAcc: dN > 0 ? (dOk / dN * 100).toFixed(0) + '%' : '—',
+      valWeeks: metricWindow,
+      ciWeeks: ciWindow
+    }
+  };
+}
+
+// Raw ensemble (no CI/meta) — used by calcCI to avoid recursion
+function runEnsembleRaw(series, sdF, horizon) {
+  const m1 = sdRegression(series, sdF, horizon);
+  const m2 = sdBalanceModel(series, sdF, horizon);
+  const m3 = arModel(series, horizon);
+  const hasSd = countSDFeatures(sdF) >= 3;
+  const m4 = hasSd ? null : seasonalNaive(series, horizon);
+  const m5 = hasSd ? null : holtWinters(series, horizon);
+  const models = [m1, m2, m3, m4, m5];
+  const fc = [];
+  for (let h = 0; h < horizon; h++) {
+    let cnt = 0, sum = 0;
+    for (const m of models) { if (m) { sum += m[h]; cnt++; } }
+    fc.push(cnt > 0 ? sum / cnt : series[series.length - 1].value);
+  }
+  return fc;
+}
+
+// Lite ensemble — runs 3 models + applies cached weights/meta-learner.
+// Skips CI, metrics, weight training, and meta-learner training.
+// Used by backtest and cross-PADD snapshot for performance.
+function runEnsembleLite(series, sdF, horizon) {
+  const regime = detectRegime(series, sdF);
+  const hasSdData = countSDFeatures(sdF) >= 3;
+
+  const m1 = sdRegression(series, sdF, horizon);
+  const m2 = sdBalanceModel(series, sdF, horizon);
+  const m3 = arModel(series, horizon);
+
+  const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+  const needFallback = !hasSdData || primaryCount < 2;
+  const m4 = needFallback ? seasonalNaive(series, horizon) : null;
+  const m5 = needFallback ? holtWinters(series, horizon) : null;
+  const models = [m1, m2, m3, m4, m5];
+
+  // Use cached meta-learner + weights if available, otherwise use defaults
+  const cacheKey = weightCacheKey(series);
+  const metaModel = WEIGHT_CACHE.get(cacheKey + '_meta') || null;
+  const w = WEIGHT_CACHE.get(cacheKey + '_weights') ||
+            (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+  const fc = [];
+  for (let h = 0; h < horizon; h++) {
+    let val = null;
+    if (metaModel && metaModel.mean && m1 && m2 && m3) {
+      const rf = regimeFeatures(regime);
+      const metaFeatures = [m1[h], m2[h], m3[h], ...rf];
+      val = applyMetaLearner(metaModel, metaFeatures);
+      const modelOutputs = [m1[h], m2[h], m3[h]];
+      const mn = Math.min(...modelOutputs), mx = Math.max(...modelOutputs);
+      const range = mx - mn;
+      if (val < mn - range * 0.5 || val > mx + range * 0.5) val = null;
+    }
+    if (val == null) {
+      let ws = 0, vs = 0;
+      for (let i = 0; i < NUM_MODELS; i++) {
+        if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+      }
+      val = ws > 0 ? vs / ws : series[series.length - 1].value;
+    }
+    fc.push(val);
+  }
+
+  return {
+    ensemble: fc,
+    sdReg: m1 || fc,
+    sdBalance: m2 || fc,
+    arModel: m3 || fc,
+    sdRegRaw: m1,
+    sdBalanceRaw: m2,
+    arModelRaw: m3,
+    regime,
+    weights: w
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// 5-YEAR AVERAGE CALCULATOR
+// ═══════════════════════════════════════════════════════════
+function calc5YrAvg(series) {
+  // For each week in the visible range, compute the 5-year average and min/max
+  const byWeek = {};
+  const currentYear = new Date().getFullYear();
+  for (const d of series) {
+    const yr = parseInt(d.date.substring(0, 4));
+    if (yr >= currentYear || yr < currentYear - 5) continue;
+    const wk = weekOfYear(d.date);
+    if (!byWeek[wk]) byWeek[wk] = [];
+    byWeek[wk].push(d.value);
+  }
+  return byWeek;
+}
+
+function get5YrBandForSeries(series) {
+  const avgData = calc5YrAvg(series);
+  const result = [];
+  // Generate a point for each week of the most recent year in the series
+  for (const d of series) {
+    const wk = weekOfYear(d.date);
+    const vals = avgData[wk];
+    if (vals && vals.length >= 2) {
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const mn = Math.min(...vals);
+      const mx = Math.max(...vals);
+      result.push({date: d.date, avg, min: mn, max: mx});
+    }
+  }
+  return result;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════
+let mainChart, seasonalChart, backtestChart, btScatterChart;
+const CC = {
+  history: '#58a6ff', forecast: '#39d2c0',
+  ciBand: 'rgba(57,210,192,0.1)', ciBorder: 'rgba(57,210,192,0.25)',
+  seasonal: '#bc8cff', hw: '#f778ba', sdreg: '#d29922', ar: '#6e7681', sdbal: '#f47067', adjusted: '#f0883e',
+  avg5yr: 'rgba(88,166,255,0.08)', avg5yrBorder: 'rgba(88,166,255,0.2)',
+  avg5yrLine: 'rgba(88,166,255,0.35)'
+};
+
+const crosshairPlugin = {
+  id: 'crosshair',
+  afterDraw(chart) {
+    if (chart.tooltip?._active?.length) {
+      const x = chart.tooltip._active[0].element.x;
+      const yAxis = chart.scales.y;
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, yAxis.top);
+      ctx.lineTo(x, yAxis.bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(139,148,158,0.3)';
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+};
+Chart.register(crosshairPlugin);
+
+const tooltipStyle = {
+  backgroundColor: 'rgba(13,17,23,0.95)',
+  titleColor: '#e6edf3',
+  bodyColor: '#b0b8c1',
+  titleFont: {family: 'JetBrains Mono', size: 12, weight: '600'},
+  bodyFont: {family: 'JetBrains Mono', size: 11},
+  borderColor: '#30363d',
+  borderWidth: 1,
+  padding: 12,
+  cornerRadius: 6,
+  boxPadding: 4,
+  usePointStyle: true,
+  pointStyleWidth: 8
+};
+
+let chartViewRange = '1y';
+let chartCustomFrom = null;
+let chartCustomTo = null;
+
+function getChartCutoff(series) {
+  if (chartCustomFrom) return new Date(chartCustomFrom);
+  const now = new Date();
+  switch (chartViewRange) {
+    case '6m': now.setMonth(now.getMonth() - 6); return now;
+    case '1y': now.setFullYear(now.getFullYear() - 1); return now;
+    case '2y': now.setFullYear(now.getFullYear() - 2); return now;
+    case '5y': now.setFullYear(now.getFullYear() - 5); return now;
+    case 'all': return new Date(series[0].date);
+    default: now.setFullYear(now.getFullYear() - 1); return now;
+  }
+}
+
+function renderMainChart(series, fc) {
+  const ctx = document.getElementById('chart-main').getContext('2d');
+  if (mainChart) mainChart.destroy();
+
+  const cut = getChartCutoff(series);
+  const hist = series.filter(d => new Date(d.date) >= cut).map(d => ({x: d.date, y: d.value}));
+  const ld = new Date(series[series.length - 1].date);
+  const fds = Array.from({length: FC_WEEKS}, (_, h) => {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    return d.toISOString().split('T')[0];
+  });
+  const br = {x: series[series.length - 1].date, y: series[series.length - 1].value};
+
+  const datasets = [];
+
+  // 5-year average band (optional) — uses absolute dataset index fill
+  const show5yr = document.getElementById('chk-5yr').checked;
+  let avg5yrHighIdx = -1;
+  if (show5yr) {
+    const band = get5YrBandForSeries(series);
+    const bandFiltered = band.filter(d => new Date(d.date) >= cut);
+    if (bandFiltered.length > 10) {
+      avg5yrHighIdx = datasets.length; // track index of High dataset
+      datasets.push({
+        label: '5-Yr High',
+        data: bandFiltered.map(d => ({x: d.date, y: d.max})),
+        fill: false, // will set below after Low is added
+        borderColor: CC.avg5yrBorder,
+        borderWidth: 1,
+        pointRadius: 0,
+        borderDash: [2, 4],
+        order: 8
+      });
+      const lowIdx = datasets.length;
+      datasets.push({
+        label: '5-Yr Low',
+        data: bandFiltered.map(d => ({x: d.date, y: d.min})),
+        fill: false,
+        borderColor: CC.avg5yrBorder,
+        borderWidth: 1,
+        pointRadius: 0,
+        borderDash: [2, 4],
+        order: 8
+      });
+      // Fill High down to Low using absolute index
+      datasets[avg5yrHighIdx].fill = {target: lowIdx, above: CC.avg5yr, below: CC.avg5yr};
+      datasets.push({
+        label: '5-Yr Avg',
+        data: bandFiltered.map(d => ({x: d.date, y: d.avg})),
+        fill: false,
+        borderColor: CC.avg5yrLine,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        borderDash: [6, 4],
+        order: 7
+      });
+    }
+  }
+
+  // CI band
+  datasets.push(
+    {label: '80% CI', data: [br, ...fc.ensemble.map((v, i) => ({x: fds[i], y: v + fc.ciHigh[i]}))], fill: '+1', backgroundColor: CC.ciBand, borderColor: CC.ciBorder, borderWidth: 1, pointRadius: 0, borderDash: [3, 3], order: 5},
+    {label: 'CI Lower', data: [br, ...fc.ensemble.map((v, i) => ({x: fds[i], y: v + fc.ciLow[i]}))], fill: false, borderColor: CC.ciBorder, borderWidth: 1, pointRadius: 0, borderDash: [3, 3], order: 5}
+  );
+
+  // Historical (line only, no fill)
+  datasets.push({label: 'Historical', data: hist, borderColor: CC.history, borderWidth: 2, pointRadius: 0, fill: false, tension: .1, order: 2});
+
+  // Forecast lines
+  datasets.push(
+    {label: 'Ensemble', data: [br, ...fc.ensemble.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.forecast, borderWidth: 2.5, pointRadius: [0, 3, 3, 3, 3], pointHoverRadius: 5, pointBackgroundColor: CC.forecast, pointBorderColor: '#0d1117', pointBorderWidth: 1.5, tension: 0, order: 1},
+    {label: 'S&D Reg', data: [br, ...fc.sdReg.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.sdreg, borderWidth: 1.5, pointRadius: 0, borderDash: [5, 5], tension: 0, order: 3},
+    {label: 'S&D Balance', data: [br, ...fc.sdBalance.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.sdbal, borderWidth: 1.5, pointRadius: 0, borderDash: [5, 5], tension: 0, order: 3},
+    {label: 'AR Model', data: [br, ...fc.arModel.map((v, i) => ({x: fds[i], y: v}))], borderColor: CC.ar, borderWidth: 1.5, pointRadius: 0, borderDash: [5, 5], tension: 0, order: 3}
+  );
+
+  // Adjusted Ensemble line (only when analyst adjustments are active)
+  const adjFc = getAdjustedForecast(fc);
+  if (adjFc) {
+    datasets.push({
+      label: 'Adjusted Ensemble',
+      data: [br, ...adjFc.map((v, i) => ({x: fds[i], y: v}))],
+      borderColor: CC.adjusted,
+      borderWidth: 2.5,
+      pointRadius: [0, 4, 4, 4, 4],
+      pointHoverRadius: 5,
+      pointBackgroundColor: '#f0883e',
+      pointBorderColor: '#0d1117',
+      pointBorderWidth: 1.5,
+      borderDash: [8, 4],
+      tension: 0,
+      order: 0
+    });
+  }
+
+  const hiddenLabels = new Set(['CI Lower', '5-Yr High', '5-Yr Low']);
+
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: {datasets},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode: 'nearest', axis: 'x', intersect: false},
+      plugins: {
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16, filter: i => !hiddenLabels.has(i.text)}},
+        tooltip: {
+          ...tooltipStyle,
+          mode: 'nearest', axis: 'x', intersect: false,
+          filter: item => {
+            if (hiddenLabels.has(item.dataset.label) || item.dataset.label === '80% CI') return false;
+            // On the last historical date, only show the Historical value
+            if (item.raw?.x === br.x && item.dataset.label !== 'Historical') return false;
+            return true;
+          },
+          callbacks: {
+            title: items => items.length ? items[0].raw?.x || '' : '',
+            label: c => {
+              const val = c.parsed.y;
+              if (val == null) return '';
+              return ` ${c.dataset.label}: ${val.toLocaleString(undefined, {maximumFractionDigits: 1})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+      }
+    }
+  });
+
+  if (!chartCustomFrom) {
+    document.getElementById('date-from').value = cut.toISOString().split('T')[0];
+    document.getElementById('date-to').value = fds[fds.length - 1];
+  }
+}
+
+// Seasonal chart
+const YEAR_COLORS = {
+  2020: '#f47067', 2021: '#e0823d', 2022: '#d29922',
+  2023: '#bc8cff', 2024: '#58a6ff', 2025: '#f778ba', 2026: '#39d2c0'
+};
+const FALLBACK_COLORS = ['#6e7681', '#b0b8c1', '#484f58', '#a5d6ff', '#7ee787'];
+
+function renderSeasonalChart(series) {
+  const ctx = document.getElementById('chart-seasonal').getContext('2d');
+  if (seasonalChart) seasonalChart.destroy();
+
+  const currentYear = new Date().getFullYear();
+  const datasets = [];
+
+  function toWeekNum(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const jan1 = new Date(d.getFullYear(), 0, 1, 12, 0, 0);
+    const doy = Math.floor((d - jan1) / 86400000) + 1;
+    return Math.min(52, Math.ceil(doy / 7));
+  }
+
+  const yearsInData = new Set();
+  for (const d of series) yearsInData.add(parseInt(d.date.substring(0, 4)));
+  const years = [...yearsInData].sort();
+  let fallbackIdx = 0;
+
+  for (const yr of years) {
+    const yrData = series.filter(d => d.date.startsWith(String(yr)));
+    if (yrData.length < 4) continue;
+    const points = yrData.map(d => ({x: toWeekNum(d.date), y: d.value})).sort((a, b) => a.x - b.x);
+    const deduped = [];
+    for (const p of points) {
+      if (deduped.length > 0 && deduped[deduped.length - 1].x === p.x) {
+        deduped[deduped.length - 1] = p;
+      } else {
+        deduped.push(p);
+      }
+    }
+
+    const isCurrent = (yr === currentYear);
+    const color = YEAR_COLORS[yr] || FALLBACK_COLORS[fallbackIdx++ % FALLBACK_COLORS.length];
+    datasets.push({
+      label: String(yr),
+      data: deduped,
+      borderColor: color,
+      borderWidth: isCurrent ? 3 : 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      tension: 0.3,
+      borderDash: isCurrent ? [] : [4, 4]
+    });
+  }
+
+  const MONTH_WEEKS = [1, 5, 9, 14, 18, 22, 27, 31, 35, 40, 44, 48];
+  const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  seasonalChart = new Chart(ctx, {
+    type: 'line',
+    data: {datasets},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode: 'nearest', axis: 'x', intersect: false},
+      plugins: {
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12, usePointStyle: true}},
+        tooltip: {
+          ...tooltipStyle,
+          mode: 'nearest', axis: 'x', intersect: false,
+          callbacks: {
+            title: items => {
+              if (!items.length) return '';
+              const wk = Math.round(items[0].parsed.x);
+              const doy = (wk - 1) * 7 + 4;
+              let mIdx = 0;
+              const mStarts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+              for (let i = mStarts.length - 1; i >= 0; i--) { if (doy >= mStarts[i]) { mIdx = i; break; } }
+              const dayInMonth = Math.max(1, doy - mStarts[mIdx] + 1);
+              return `~${MONTH_NAMES[mIdx]} ${dayInMonth}  (Week ${wk})`;
+            },
+            label: c => {
+              const val = c.parsed.y;
+              if (val == null) return '';
+              return ` ${c.dataset.label}: ${val.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear', min: 1, max: 52,
+          grid: {color: 'rgba(33,38,45,0.8)'},
+          ticks: {
+            color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, autoSkip: false,
+            callback: function(v) { const idx = MONTH_WEEKS.indexOf(v); return idx >= 0 ? MONTH_NAMES[idx] : ''; },
+            maxRotation: 0
+          },
+          afterBuildTicks: function(axis) { axis.ticks = MONTH_WEEKS.map(v => ({value: v})); }
+        },
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// META-LEARNER TAB
+// ═══════════════════════════════════════════════════════════
+let mlBlendChart = null, mlRegimeChart = null;
+
+function updateMetaLearnerTab(fc) {
+  // ── Summary stats ──
+  document.getElementById('ml-status').textContent = fc.hasMeta ? 'Active' : 'Inactive';
+  document.getElementById('ml-status').style.color = fc.hasMeta ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('ml-samples').textContent = fc.metaNSamples || '—';
+  document.getElementById('ml-features').textContent = fc.metaNFeatures || '—';
+
+  // ── Regime detail ──
+  const r = fc.regime || {};
+  const seasonEl = document.getElementById('ml-r-season');
+  seasonEl.textContent = (r.season || '—').toUpperCase();
+  seasonEl.className = 'ml-regime-value ' + (r.season || '');
+  document.getElementById('ml-r-week').textContent = r.week || '—';
+
+  const volEl = document.getElementById('ml-r-vol');
+  volEl.textContent = r.volRatio != null ? r.volRatio.toFixed(2) + 'x' : '—';
+  volEl.style.color = r.volRatio > 1.5 ? 'var(--accent-red)' : 'var(--accent-green)';
+
+  const hivolEl = document.getElementById('ml-r-hivol');
+  hivolEl.textContent = r.highVol ? 'YES' : 'NO';
+  hivolEl.className = 'ml-regime-value ' + (r.highVol ? 'flag-yes' : 'flag-no');
+
+  const turnEl = document.getElementById('ml-r-turn');
+  turnEl.textContent = r.turnaround ? 'YES' : 'NO';
+  turnEl.className = 'ml-regime-value ' + (r.turnaround ? 'flag-yes' : 'flag-no');
+
+  const momEl = document.getElementById('ml-r-mom');
+  const mom = r.momentum || 0;
+  momEl.textContent = (mom >= 0 ? '+' : '') + mom.toLocaleString(undefined, {maximumFractionDigits: 0});
+  momEl.style.color = mom >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+
+  // ── Regime feature vector table ──
+  const rf = r.season ? regimeFeatures(r) : [0,0,0,0,0,0];
+  const featLabels = ['is_draw', 'is_peak', 'is_build', 'vol_ratio', 'is_turnaround', 'momentum_scaled'];
+  const featDescs = [
+    'Spring drawdown season (wk 10-24)',
+    'Peak summer demand (wk 25-36)',
+    'Fall restocking period (wk 37-46)',
+    'Recent 8wk vol / trailing 52wk vol',
+    'Refinery utilization drop >3pts / 4wks',
+    'Stock change acceleration / 5000 (normalized)'
+  ];
+  let featHtml = '';
+  for (let i = 0; i < featLabels.length; i++) {
+    const v = rf[i];
+    const cls = (v === 1 && i < 3) ? 'color:var(--accent-cyan)' : (v === 1 && i === 4) ? 'color:var(--accent-red)' : '';
+    featHtml += `<tr><td><code>${featLabels[i]}</code></td><td style="${cls};font-weight:600">${typeof v === 'number' ? (Number.isInteger(v) ? v : v.toFixed(3)) : v}</td><td style="color:var(--text-muted);font-size:.72rem">${featDescs[i]}</td></tr>`;
+  }
+  document.getElementById('ml-feat-tbody').innerHTML = featHtml;
+
+  // ── Coefficients charts (split into two for readability) ──
+  if (mlBlendChart) mlBlendChart.destroy();
+  if (mlRegimeChart) mlRegimeChart.destroy();
+
+  if (fc.metaCoeffs) {
+    const coeffs = fc.metaCoeffs;
+
+    // Chart 1: Model blend weights (3 model coefficients only)
+    const blendLabels = ['S&D Reg', 'S&D Balance', 'AR Model'];
+    const blendData = coeffs.slice(1, 4);
+    const ctx1 = document.getElementById('chart-ml-blend').getContext('2d');
+    mlBlendChart = new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: blendLabels,
+        datasets: [{
+          label: 'Blend Weight',
+          data: blendData,
+          backgroundColor: blendData.map(c => c >= 0 ? 'rgba(63,185,80,0.5)' : 'rgba(248,81,73,0.5)'),
+          borderColor: blendData.map(c => c >= 0 ? '#3fb950' : '#f85149'),
+          borderWidth: 1.5,
+          borderRadius: 3
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {display: false},
+          tooltip: {
+            ...tooltipStyle,
+            callbacks: {
+              label: c => ` ${c.label}: ${c.parsed.x.toFixed(6)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {color: 'rgba(33,38,45,0.8)'},
+            ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}},
+            title: {display: true, text: 'Coefficient (blend weight)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}}
+          },
+          y: {
+            grid: {display: false},
+            ticks: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11, weight: 'bold'}}
+          }
+        }
+      }
+    });
+
+    // Chart 2: Regime bias adjustments (6 regime coefficients)
+    const regLabels = ['is_draw', 'is_peak', 'is_build', 'vol_ratio', 'is_turnaround', 'momentum_scaled'];
+    const regData = coeffs.slice(4);
+    const rfVec = fc.regime ? regimeFeatures(fc.regime) : [0,0,0,0,0,0];
+    // Color active features brighter
+    const regBg = regData.map((c, i) => {
+      const active = rfVec[i] !== 0;
+      if (c >= 0) return active ? 'rgba(63,185,80,0.7)' : 'rgba(63,185,80,0.2)';
+      return active ? 'rgba(248,81,73,0.7)' : 'rgba(248,81,73,0.2)';
+    });
+    const regBorder = regData.map((c, i) => {
+      const active = rfVec[i] !== 0;
+      return c >= 0 ? (active ? '#3fb950' : 'rgba(63,185,80,0.3)') : (active ? '#f85149' : 'rgba(248,81,73,0.3)');
+    });
+    const ctx2 = document.getElementById('chart-ml-regime').getContext('2d');
+    mlRegimeChart = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: regLabels.map((l, i) => rfVec[i] !== 0 ? l + ' (ACTIVE)' : l),
+        datasets: [{
+          label: 'Bias (kbbl)',
+          data: regData,
+          backgroundColor: regBg,
+          borderColor: regBorder,
+          borderWidth: 1.5,
+          borderRadius: 3
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: {display: false},
+          tooltip: {
+            ...tooltipStyle,
+            callbacks: {
+              label: c => {
+                const idx = c.dataIndex;
+                const coeff = regData[idx];
+                const feat = rfVec[idx];
+                const contrib = coeff * feat;
+                return ` ${regLabels[idx]}: coeff=${coeff.toFixed(2)}, value=${typeof feat === 'number' && !Number.isInteger(feat) ? feat.toFixed(3) : feat}, contribution=${contrib.toFixed(1)} kbbl`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {color: 'rgba(33,38,45,0.8)'},
+            ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}},
+            title: {display: true, text: 'Bias adjustment (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}}
+          },
+          y: {
+            grid: {display: false},
+            ticks: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}}
+          }
+        }
+      }
+    });
+  }
+
+  // ── Blending walkthrough table ──
+  let blendHtml = '';
+  if (fc.metaCoeffs && fc.regime) {
+    const coeffs = fc.metaCoeffs;
+    const rfVec = regimeFeatures(fc.regime);
+
+    // Intercept row
+    blendHtml += `<tr style="background:var(--bg-input)"><td><strong>Intercept</strong></td><td style="font-size:.72rem">${coeffs[0].toFixed(2)}</td>`;
+    for (let h = 0; h < 4; h++) blendHtml += `<td>${coeffs[0].toFixed(1)}</td>`;
+    blendHtml += '</tr>';
+
+    // Model prediction rows
+    const modelNames = ['S&D Reg', 'S&D Balance', 'AR Model'];
+    const modelData = [fc.sdReg, fc.sdBalance, fc.arModel];
+    for (let m = 0; m < 3; m++) {
+      blendHtml += `<tr><td><strong>${modelNames[m]}</strong></td><td style="font-size:.72rem">${coeffs[m + 1].toFixed(6)}</td>`;
+      for (let h = 0; h < 4; h++) {
+        const pred = modelData[m][h];
+        const contrib = coeffs[m + 1] * pred;
+        blendHtml += `<td>${fmtVal(pred)} <span style="color:var(--text-muted);font-size:.65rem">(${contrib >= 0 ? '+' : ''}${fmtVal(contrib)})</span></td>`;
+      }
+      blendHtml += '</tr>';
+    }
+
+    // Regime feature rows
+    const regLabels2 = ['is_draw', 'is_peak', 'is_build', 'vol_ratio', 'is_turnaround', 'momentum_scaled'];
+    for (let i = 0; i < rfVec.length; i++) {
+      const v = rfVec[i];
+      const c = coeffs[4 + i];
+      const contrib = c * v;
+      const isActive = v !== 0;
+      blendHtml += `<tr style="${isActive ? '' : 'opacity:0.4'}"><td><code>${regLabels2[i]}</code></td><td style="font-size:.72rem">${c.toFixed(4)}</td>`;
+      for (let h = 0; h < 4; h++) {
+        blendHtml += `<td>${typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(2) : v} <span style="color:var(--text-muted);font-size:.65rem">(${contrib >= 0 ? '+' : ''}${contrib.toFixed(1)})</span></td>`;
+      }
+      blendHtml += '</tr>';
+    }
+
+    // Totals row — meta-learner output
+    blendHtml += '<tr style="border-top:2px solid var(--border-accent);background:var(--bg-input)"><td><strong style="color:var(--accent-cyan)">Meta-Learner Output</strong></td><td></td>';
+    for (let h = 0; h < 4; h++) {
+      const features = [modelData[0][h], modelData[1][h], modelData[2][h], ...rfVec];
+      let metaVal = coeffs[0];
+      for (let j = 0; j < features.length; j++) metaVal += coeffs[j + 1] * features[j];
+      blendHtml += `<td><strong style="color:var(--accent-cyan)">${fmtVal(metaVal)}</strong></td>`;
+    }
+    blendHtml += '</tr>';
+
+    // Fallback weighted avg row
+    blendHtml += '<tr style="opacity:0.6"><td>Fallback (inv-MAE avg)</td><td></td>';
+    for (let h = 0; h < 4; h++) {
+      const preds = [fc.sdReg[h], fc.sdBalance[h], fc.arModel[h]];
+      let ws = 0, vs = 0;
+      for (let i = 0; i < 3; i++) { vs += fc.weights[i] * preds[i]; ws += fc.weights[i]; }
+      blendHtml += `<td>${fmtVal(ws > 0 ? vs / ws : 0)}</td>`;
+    }
+    blendHtml += '</tr>';
+
+    // Final ensemble row
+    blendHtml += '<tr style="border-top:2px solid var(--accent-green);background:var(--bg-input)"><td><strong style="color:var(--accent-green)">FINAL ENSEMBLE</strong></td><td></td>';
+    for (let h = 0; h < 4; h++) {
+      blendHtml += `<td><strong style="color:var(--accent-green)">${fmtVal(fc.ensemble[h])}</strong></td>`;
+    }
+    blendHtml += '</tr>';
+  } else {
+    blendHtml = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px">Meta-learner inactive — not enough training data or S&D features unavailable</td></tr>';
+  }
+  document.getElementById('ml-blend-tbody').innerHTML = blendHtml;
+
+  // ── Fallback weight bars ──
+  const barNames = ['S&D Reg', 'S&D Balance', 'AR Model'];
+  const barColors = ['var(--accent-orange)', 'var(--accent-red)', 'var(--text-muted)'];
+  const maxW = Math.max(...fc.weights.slice(0, 3));
+  let barHtml = '';
+  for (let i = 0; i < 3; i++) {
+    const pct = maxW > 0 ? (fc.weights[i] / maxW * 100).toFixed(1) : 0;
+    barHtml += `<div class="bt-error-bar"><span class="bt-error-bar-label">${barNames[i]}</span><div class="bt-error-bar-track"><div class="bt-error-bar-fill" style="width:${pct}%;background:${barColors[i]}"></div></div><span class="bt-error-bar-val">${(fc.weights[i] * 100).toFixed(0)}%</span></div>`;
+  }
+  document.getElementById('ml-fallback-bars').innerHTML = barHtml;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ANALYST ADJUSTMENTS UI
+// ═══════════════════════════════════════════════════════════
+function updateAdjPresetButtons() {
+  const type = document.getElementById('adj-type').value;
+  const presets = getAdjPresets(type);
+  const container = document.getElementById('adj-presets');
+  container.innerHTML = presets.map((v, i) =>
+    `<button class="adj-preset" data-val="${v}">${ADJ_PRESET_LABELS[i]}: ${v.toLocaleString()}</button>`
+  ).join('');
+  container.querySelectorAll('.adj-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('adj-impact').value = btn.dataset.val;
+    });
+  });
+  const padd = document.getElementById('sel-padd').value;
+  document.getElementById('adj-hint').textContent = padd === 'NUS'
+    ? 'Presets calibrated for US Total. Enter any custom kbbl value.'
+    : `Presets auto-scaled for ${PL[padd]}. Enter any custom kbbl value.`;
+}
+
+function renderAdjustmentsTable() {
+  const tbody = document.getElementById('adj-tbody');
+  const table = document.getElementById('adj-table');
+  const empty = document.getElementById('adj-empty');
+
+  if (analystAdjustments.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  let html = '';
+  for (const adj of analystAdjustments) {
+    const dirClass = adj.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const dirLabel = adj.direction > 0 ? 'Bullish' : 'Bearish';
+    const signed = adj.direction > 0 ? '+' : '-';
+    html += `<tr>
+      <td>${ADJ_TYPE_LABELS[adj.type] || adj.type}</td>
+      <td class="${dirClass}">${dirLabel}</td>
+      <td class="${dirClass}">${signed}${adj.impact.toLocaleString()}</td>
+      <td>${adj.weeks[0] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[1] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[2] ? '&#10003;' : ''}</td>
+      <td>${adj.weeks[3] ? '&#10003;' : ''}</td>
+      <td style="font-size:.72rem;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(adj.notes || '').replace(/"/g, '&quot;')}">${adj.notes || '—'}</td>
+      <td><button class="adj-del-btn" data-id="${adj.id}">&times;</button></td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+
+  // Totals
+  const net = getNetAdjustments();
+  document.getElementById('adj-total-impact').textContent = '—';
+  for (let h = 0; h < 4; h++) {
+    const el = document.getElementById(`adj-total-w${h + 1}`);
+    const cls = net[h] > 0 ? 'adj-positive' : net[h] < 0 ? 'adj-negative' : '';
+    el.className = cls;
+    el.textContent = net[h] !== 0 ? (net[h] > 0 ? '+' : '') + net[h].toLocaleString() : '0';
+  }
+
+  // Wire delete buttons
+  tbody.querySelectorAll('.adj-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      analystAdjustments = analystAdjustments.filter(a => a.id !== parseInt(btn.dataset.id));
+      saveAdjustments();
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+    });
+  });
+}
+
+function updateAdjCompare() {
+  const app = window.__app;
+  const table = document.getElementById('adj-compare');
+  const empty = document.getElementById('adj-compare-empty');
+  const tbody = document.getElementById('adj-compare-tbody');
+
+  if (analystAdjustments.length === 0 || !app || !app.currentFc) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    return;
+  }
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  const fc = app.currentFc;
+  const net = getNetAdjustments();
+  let html = '';
+  for (let h = 0; h < FC_WEEKS; h++) {
+    const model = fc.ensemble[h];
+    const adj = net[h];
+    const adjusted = model + adj;
+    const pct = model !== 0 ? ((adj / model) * 100).toFixed(2) : '0.00';
+    const cls = adj > 0 ? 'adj-positive' : adj < 0 ? 'adj-negative' : '';
+    html += `<tr>
+      <td>+${h + 1}W</td>
+      <td>${fmtVal(model)}</td>
+      <td class="${cls}">${adj !== 0 ? (adj > 0 ? '+' : '') + adj.toLocaleString() : '0'}</td>
+      <td><strong>${fmtVal(adjusted)}</strong></td>
+      <td class="${cls}">${adj !== 0 ? (pct > 0 ? '+' : '') + pct + '%' : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+function refreshChartWithAdjustments() {
+  const app = window.__app;
+  if (app && app.currentSeries && app.currentFc) {
+    renderMainChart(app.currentSeries, app.currentFc);
+    // Update forecast cards with adjusted values
+    const adjFc = getAdjustedForecast(app.currentFc);
+    for (let h = 0; h < 4; h++) {
+      const adjEl = document.getElementById(`fc${h + 1}-adj`);
+      const v = app.currentFc.ensemble[h];
+      if (adjFc && adjFc[h] !== v) {
+        adjEl.textContent = `(${adjFc[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
+        adjEl.style.display = '';
+      } else {
+        adjEl.style.display = 'none';
+      }
+    }
+    // Rebuild detail table to reflect adjusted column
+    const fc = app.currentFc;
+    const series = app.currentSeries;
+    const last = series[series.length - 1].value;
+    const ld = new Date(series[series.length - 1].date);
+    const adjTh = document.getElementById('detail-adj-th');
+    adjTh.style.display = adjFc ? '' : 'none';
+    const dt = document.getElementById('detail-tbody');
+    let dr = '';
+    for (let h = 0; h < FC_WEEKS; h++) {
+      const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+      const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h - 1], ch = e - pv;
+      dr += `<tr><td>${d.toISOString().split('T')[0]}</td>
+        <td>${fmtVal(e)}</td>
+        <td class="${ch >= 0 ? 'positive' : 'negative'}">${fmtChg(ch)}</td>
+        <td>${fmtVal(e + fc.ciLow[h])}</td><td>${fmtVal(e + fc.ciHigh[h])}</td>
+        <td>${fmtVal(fc.sdReg[h])}</td><td>${fmtVal(fc.sdBalance[h])}</td><td>${fmtVal(fc.arModel[h])}</td>`;
+      if (adjFc) {
+        const adjV = adjFc[h], adjDiff = adjV - e;
+        dr += `<td style="color:${adjDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};font-weight:600">${fmtVal(adjV)}</td>`;
+      }
+      dr += '</tr>';
+    }
+    dt.innerHTML = dr;
+  }
+}
+
+function renderJournalUI() {
+  const stats = getJournalStats();
+  const scored = adjustmentJournal.filter(e => e.scored);
+  const empty = document.getElementById('journal-empty');
+  const scorecard = document.getElementById('journal-scorecard');
+  const table = document.getElementById('journal-table');
+  const tbody = document.getElementById('journal-tbody');
+
+  if (!stats || scored.length === 0) {
+    empty.style.display = '';
+    scorecard.style.display = 'none';
+    table.style.display = 'none';
+    // Show pending count if any
+    const pending = adjustmentJournal.filter(e => !e.scored).length;
+    if (pending > 0) {
+      empty.textContent = `${pending} adjustment(s) logged and awaiting actual data for scoring.`;
+    } else {
+      empty.textContent = 'No journal entries yet. Add adjustments and wait for actual data to arrive for scoring.';
+    }
+    return;
+  }
+
+  empty.style.display = 'none';
+  scorecard.style.display = '';
+  table.style.display = '';
+
+  // Scorecard
+  document.getElementById('j-entries').textContent = stats.totalEntries;
+  document.getElementById('j-adj-pct').textContent = stats.adjBetterPct + '%';
+  document.getElementById('j-model-pct').textContent = stats.modelBetterPct + '%';
+  const improv = parseFloat(stats.improvement);
+  document.getElementById('j-improvement').textContent = (improv >= 0 ? '+' : '') + stats.improvement + '%';
+  document.getElementById('j-improvement').style.color = improv >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('j-model-mae').textContent = fmtVal(stats.avgModelMAE);
+  document.getElementById('j-adj-mae').textContent = fmtVal(stats.avgAdjMAE);
+
+  // Quality indicators
+  const adjPctEl = document.getElementById('j-adj-pct');
+  const pctVal = parseFloat(stats.adjBetterPct);
+  adjPctEl.style.color = pctVal >= 55 ? 'var(--accent-green)' : pctVal >= 45 ? 'var(--accent-orange)' : 'var(--accent-red)';
+
+  // Table
+  let html = '';
+  for (const entry of scored) {
+    const modelErr = entry.actuals[0] != null ? Math.abs(entry.modelEnsemble[0] - entry.actuals[0]) : null;
+    const adjErr = entry.actuals[0] != null ? Math.abs(entry.adjustedEnsemble[0] - entry.actuals[0]) : null;
+    let winner = '—', winClass = '';
+    if (modelErr != null && adjErr != null) {
+      if (adjErr < modelErr) { winner = 'Adj.'; winClass = 'adj-positive'; }
+      else if (modelErr < adjErr) { winner = 'Model'; winClass = 'adj-negative'; }
+      else { winner = 'Tie'; }
+    }
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr>
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td>${entry.actuals[0] != null ? fmtVal(entry.actuals[0]) : '<em>pending</em>'}</td>
+      <td class="${winClass}" style="font-weight:600">${winner}</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  // Also show pending entries
+  const pending = adjustmentJournal.filter(e => !e.scored);
+  for (const entry of pending) {
+    const dirClass = entry.direction > 0 ? 'adj-positive' : 'adj-negative';
+    const created = new Date(entry.createdAt).toLocaleDateString();
+    html += `<tr style="opacity:.6">
+      <td>${created}</td>
+      <td>${ADJ_TYPE_LABELS[entry.adjType] || entry.adjType}</td>
+      <td>${PL[entry.padd] || entry.padd}</td>
+      <td class="${dirClass}">${entry.direction > 0 ? 'Bullish' : 'Bearish'}</td>
+      <td>${entry.impact.toLocaleString()}</td>
+      <td>${fmtVal(entry.modelEnsemble[0])}</td>
+      <td>${fmtVal(entry.adjustedEnsemble[0])}</td>
+      <td><em>awaiting data</em></td>
+      <td>—</td>
+      <td style="font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(entry.notes || '').replace(/"/g, '&quot;')}">${entry.notes || '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// CSV EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportCSV(series, fc) {
+  const ld = new Date(series[series.length - 1].date);
+  const last = series[series.length - 1].value;
+  const adjFc = getAdjustedForecast(fc);
+  const hasAdj = adjFc != null;
+  let csv = 'Week Ending,Ensemble (kbbl),Change (kbbl),CI Low 80% (kbbl),CI High 80% (kbbl),S&D Reg (kbbl),S&D Balance (kbbl),AR Model (kbbl)';
+  if (hasAdj) csv += ',Adjusted (kbbl),Adjustment (kbbl)';
+  csv += '\n';
+  for (let h = 0; h < FC_WEEKS; h++) {
+    const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+    const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h - 1], ch = e - pv;
+    const sr = fc.sdReg[h], sb = fc.sdBalance[h], ar = fc.arModel[h];
+    csv += `${d.toISOString().split('T')[0]},${e.toFixed(1)},${ch.toFixed(1)},${(e + fc.ciLow[h]).toFixed(1)},${(e + fc.ciHigh[h]).toFixed(1)},${sr != null ? sr.toFixed(1) : ''},${sb != null ? sb.toFixed(1) : ''},${ar != null ? ar.toFixed(1) : ''}`;
+    if (hasAdj) {
+      const net = getNetAdjustments();
+      csv += `,${adjFc[h].toFixed(1)},${net[h].toFixed(1)}`;
+    }
+    csv += '\n';
+  }
+  const blob = new Blob([csv], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `total_gasoline_forecast_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log('CSV exported' + (hasAdj ? ' (includes analyst adjustments)' : ''), 'ok');
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════
+const APP = window.__app = {
+  rawData: {},
+  currentSeries: null,
+  currentFc: null,
+  forecastCache: {},  // per-PADD forecast cache keyed by padd + lastDate
+  dataLoadedAt: 0,
+  DATA_TTL: 30 * 60 * 1000,
+
+  async init() {
+    log('Total Gasoline Stocks Model v6.3', 'ok');
+    log('Primary: S&D Regression (feat-selected) + S&D Balance (seasonal) + AR(6)', 'ok');
+    log('v6.3: Per-horizon meta-learner, feature normalization, improved PADD data', 'ok');
+
+    setLoader(10, 'Loading stock data...');
+
+    {
+      const cfg = PRODUCT_CFG;
+      log(`Loading ${cfg.label}...`);
+      const url = stocUrl(cfg.productCode);
+      log(`  URL: .../stoc/... product=${cfg.productCode}`);
+      const r = await tfetch(url);
+      const n = r?.response?.data?.length || 0;
+      if (n > 0) {
+        const testSeries = extractSeries(r, 'NUS');
+        const nonZero = testSeries.filter(d => d.value !== 0).length;
+        log(`  OK ${n} records, NUS: ${testSeries.length} wks (${nonZero} non-zero)`, 'ok');
+        if (testSeries.length > 0) {
+          const sample = testSeries.slice(-3).map(d => `${d.date}=${d.value}`).join(', ');
+          log(`  Latest: ${sample}`);
+        }
+        this.rawData[PRODUCT_KEY] = r;
+      } else {
+        log(`  No data returned`, 'warn');
+      }
+    }
+
+    const loaded = Object.keys(this.rawData).length;
+    log(`Data loaded: ${loaded > 0 ? 'OK' : 'FAILED'}`, loaded > 0 ? 'ok' : 'err');
+
+    if (loaded === 0) {
+      log('FATAL: No data loaded. Check API key.', 'err');
+      setLoader(100, 'No data — check log');
+      setStatus('error', 'NO DATA');
+      setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 1500);
+      return;
+    }
+
+    // v4: Fetch S&D fundamentals data in parallel
+    setLoader(50, 'Loading S&D fundamentals...');
+    log('--- Loading Supply & Demand data ---', 'ok');
+    let sdTotal = 0;
+    try {
+      const [c1, c2, c3, c4] = await Promise.all([
+        fetchSDProduction(),
+        fetchSDTrade(),
+        fetchSDRefinery(),
+        fetchSDDemand()
+      ]);
+      sdTotal = c1 + c2 + c3 + c4;
+    } catch(e) {
+      log('S&D fetch error: ' + e.message, 'warn');
+    }
+    const sdKeys = Object.keys(SD_DATA).length;
+    log(`S&D data loaded: ${sdKeys} series total`, sdKeys > 0 ? 'ok' : 'warn');
+    document.getElementById('sd-badge').innerHTML = `S&D: <strong>${sdKeys} series</strong>`;
+
+    this.dataLoadedAt = Date.now();
+    setLoader(80, 'Running forecast...');
+    this.runForecast();
+
+    setLoader(100, 'Done.');
+    setTimeout(() => { document.getElementById('loading-overlay').classList.add('hidden'); setStatus('ready', 'READY'); }, 500);
+
+    // Event listeners
+    document.getElementById('btn-run').addEventListener('click', () => this.runForecast(true));
+    // No product selector — Total Motor Gasoline only
+    document.getElementById('sel-padd').addEventListener('change', () => this.runForecast());
+
+    document.getElementById('btn-refresh').addEventListener('click', async () => {
+      log('--- Refreshing data from EIA... ---', 'ok');
+      setStatus('loading', 'REFRESHING...');
+      for (const key in cache) delete cache[key];
+      for (const key in SD_DATA) delete SD_DATA[key];
+      WEIGHT_CACHE.clear();
+      this.rawData = {};
+      this.currentSeries = null;
+      this.currentFc = null;
+      this.forecastCache = {};
+      {
+        log(`Reloading ${PRODUCT_CFG.label}...`);
+        const url = stocUrl(PRODUCT_CFG.productCode);
+        const r = await tfetch(url);
+        const n = r?.response?.data?.length || 0;
+        if (n > 0) {
+          this.rawData[PRODUCT_KEY] = r;
+          const testSeries = extractSeries(r, 'NUS');
+          log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
+        } else {
+          log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
+        }
+      }
+      // Re-fetch S&D data
+      log('Reloading S&D data...', 'ok');
+      await Promise.all([fetchSDProduction(), fetchSDTrade(), fetchSDRefinery(), fetchSDDemand()]);
+      document.getElementById('sd-badge').innerHTML = `S&D: <strong>${Object.keys(SD_DATA).length} series</strong>`;
+      this.dataLoadedAt = Date.now();
+      this.runForecast();
+      log('Data refreshed', 'ok');
+    });
+
+    document.getElementById('btn-export').addEventListener('click', () => {
+      if (this.currentSeries && this.currentFc) {
+        exportCSV(this.currentSeries, this.currentFc);
+      } else {
+        log('No forecast to export', 'warn');
+      }
+    });
+
+    // Help modal
+    const helpOverlay = document.getElementById('help-modal-overlay');
+    const helpBody = document.getElementById('help-modal-body');
+    const HELP_HTML = `
+<h1>Total Gasoline Stocks Model v6.3</h1>
+<p>A single-file, browser-based dashboard for forecasting weekly US <strong>Total Motor Gasoline</strong> inventory levels using live EIA petroleum data. Covers US Total and all five PADD regions with analyst adjustment journaling and forward-tracking accuracy scoring.</p>
+<hr>
+<h2>Overview</h2>
+<p>This model fetches live weekly petroleum data from the EIA API v2 and runs a stacked ensemble forecast to predict gasoline stock levels <strong>1\u20134 weeks forward</strong>. Three fundamental models feed into a meta-learner that adapts its blending weights based on the current market regime.</p>
+<p><strong>Product:</strong> Total Motor Gasoline (EIA code: EPM0)</p>
+<p><strong>Regions:</strong></p>
+<ul>
+<li>U.S. Total (NUS)</li>
+<li>PADD 1 \u2014 East Coast</li>
+<li>PADD 2 \u2014 Midwest</li>
+<li>PADD 3 \u2014 Gulf Coast</li>
+<li>PADD 4 \u2014 Rocky Mountain</li>
+<li>PADD 5 \u2014 West Coast</li>
+</ul>
+<hr>
+<h2>Data Inputs</h2>
+<p>All data is pulled live from the <code>EIA API v2</code>:</p>
+<table>
+<tr><th>Series</th><th>Description</th></tr>
+<tr><td>Weekly Stocks</td><td>Primary target variable (kbbl)</td></tr>
+<tr><td>Production</td><td>Finished gasoline output from refineries</td></tr>
+<tr><td>Imports / Exports</td><td>Trade flows (gasoline, RBOB, CBOB)</td></tr>
+<tr><td>Refinery Utilization</td><td>Capacity utilization rate (%)</td></tr>
+<tr><td>Crude Inputs</td><td>Crude oil input to refineries</td></tr>
+<tr><td>Blender Inputs</td><td>RBOB and CBOB blender net inputs</td></tr>
+<tr><td>Demand (Product Supplied)</td><td>Implied weekly consumption (US-total only; PADD demand estimated via stock-share proportioning)</td></tr>
+</table>
+<p>Data is cached in-memory with a <strong>30-minute TTL</strong> and auto-refreshes when stale. Up to <strong>8 S&amp;D feature series</strong> are loaded per region.</p>
+<hr>
+<h2>Prediction Models</h2>
+<p>Three primary models form the base layer:</p>
+<h3>1. S&amp;D Regression</h3>
+<p>Ridge regression (\u03bb = 1.0) with <strong>forward stepwise feature selection</strong>. Starts with core features (seasonality harmonics, momentum, YoY change) and greedily adds S&amp;D features only if they improve out-of-sample validation accuracy. Prevents overfitting to noisy inputs.</p>
+<h3>2. S&amp;D Balance</h3>
+<p>Seasonally-aware flow model. Computes implied weekly stock change from Production + Imports \u2013 Exports \u2013 Demand, calibrated against actual stock changes over the last 26 weeks. Projects forward using <strong>same-week-last-year</strong> component values adjusted by current deviation from seasonal norms.</p>
+<h3>3. AR(6) Autoregressive</h3>
+<p>Pure time-series model using lags 1\u20136 plus a seasonal lag (week 52). Captures momentum and mean reversion. Acts as the baseline when S&amp;D data is sparse.</p>
+<p><strong>Fallback models</strong> (activated only when S&amp;D data is insufficient):</p>
+<ul>
+<li><strong>Seasonal Naive</strong> \u2014 Weighted multi-year same-week average with trend adjustment</li>
+<li><strong>Holt-Winters</strong> \u2014 Exponential smoothing with grid-searched \u03b1, \u03b2, \u03b3 parameters</li>
+</ul>
+<hr>
+<h2>Regime Detection</h2>
+<p>Before blending, the model classifies the current market environment using 7 features:</p>
+<table>
+<tr><th>Feature</th><th>Description</th></tr>
+<tr><td>Season (4 one-hot)</td><td><strong>Draw</strong> (wk 10\u201324), <strong>Peak</strong> (wk 25\u201336), <strong>Build</strong> (wk 37\u201346), <strong>Shoulder</strong> (wk 47\u20139)</td></tr>
+<tr><td>Volatility ratio</td><td>Recent 8-week vol \u00f7 trailing 52-week vol (&gt;1.5\u00d7 = high volatility)</td></tr>
+<tr><td>Turnaround flag</td><td>Refinery utilization dropped &gt;3 pts in 4 weeks</td></tr>
+<tr><td>Momentum</td><td>4-week stock change acceleration/deceleration (kbbl)</td></tr>
+</table>
+<hr>
+<h2>Meta-Learner (Ensemble Blending)</h2>
+<p>A ridge regression (\u03bb = 0.5) trained on 30-week rolling backtest data. Learns <strong>10 coefficients</strong>:</p>
+<ul>
+<li>1 intercept</li>
+<li>3 model blend weights \u2014 how much to trust each base model</li>
+<li>7 regime bias adjustments \u2014 regime-conditional corrections in kbbl</li>
+</ul>
+<p>A <strong>sanity check</strong> bounds the meta-learner output to \u00b150% of the model spread. If it extrapolates too far, the system falls back to inverse-MAE weighted averaging with exponential decay (most recent weeks weighted highest).</p>
+<hr>
+<h2>Confidence Intervals</h2>
+<p>80% CIs are computed from a <strong>52-week</strong> rolling backtest window. The 10th and 90th percentile of historical ensemble residuals define the band at each forecast horizon. Falls back to scaled standard deviation when backtest sample is too small.</p>
+<hr>
+<h2>Dashboard Tabs</h2>
+<h3>Forecast Tab</h3>
+<ul>
+<li><strong>Forecast cards</strong>: +1W through +4W predictions with % change badges, 80% CI ranges, and YoY comparisons</li>
+<li><strong>Interactive chart</strong>: Historical stocks, ensemble line, individual model lines, adjusted ensemble (when active), and optional 5-year avg band</li>
+<li><strong>Cross-PADD Snapshot</strong>: All 6 regions\u2019 latest stocks, weekly change, +1W and +4W forecasts (computed with full S&amp;D features for each PADD), and position vs. 5-year average</li>
+<li><strong>Detailed forecast table</strong>: All model outputs, CI bounds, with adjusted column when adjustments are active</li>
+<li><strong>CSV export</strong>: Full forecast including adjusted values if applicable</li>
+</ul>
+<h3>Backtest Tab</h3>
+<ul>
+<li><strong>Rolling backtest</strong>: Runs the full ensemble (including meta-learner and regime detection) at each historical point</li>
+<li><strong>Summary stats</strong>: MAPE, MAE, directional accuracy, sample count</li>
+<li><strong>Per-model MAE comparison</strong>: Visual bars comparing Ensemble vs. S&amp;D Reg vs. S&amp;D Balance vs. AR</li>
+<li><strong>Scatter plot</strong>: Predicted vs. Actual with perfect-line reference</li>
+<li>Configurable horizon (+1W to +4W) and window (26, 52, or 104 weeks)</li>
+</ul>
+<h3>Meta-Learner Tab</h3>
+<ul>
+<li><strong>Current regime</strong>: Season, volatility, turnaround, momentum</li>
+<li><strong>Regime feature vector</strong>: All 7 features the meta-learner sees</li>
+<li><strong>Model blend weights chart</strong>: Bar chart of the 3 base model coefficients</li>
+<li><strong>Regime bias chart</strong>: All 7 regime coefficients with active features highlighted</li>
+<li><strong>Blending walkthrough</strong>: Step-by-step table showing intercept + model contributions + regime biases = final output</li>
+<li><strong>Fallback weights</strong>: Inverse-MAE weights used when meta-learner is inactive</li>
+</ul>
+<h3>Analyst Adjustments Tab</h3>
+<ul>
+<li><strong>Adjustment builder</strong>: Add qualitative overlays (refinery outage, weather event, demand shock, etc.) with direction (Bullish/Bearish), magnitude in kbbl, and affected weeks</li>
+<li><strong>Smart presets</strong>: Impact suggestions auto-scaled by region\u2019s share of national stocks</li>
+<li><strong>Active adjustments table</strong>: Shows all current adjustments with net impact per forecast week</li>
+<li><strong>Adjusted vs. Model comparison</strong>: Side-by-side table of model ensemble vs. adjusted forecast</li>
+<li><strong>Adjustment Journal</strong>: Forward-tracking performance scorer. When you add an adjustment, it snapshots the model forecast. As actual EIA data arrives, the journal scores whether your adjusted forecast was closer to actuals than the model alone. Tracks win rate, MAE improvement, and per-entry detail.</li>
+</ul>
+<hr>
+<h2>Usage</h2>
+<ol>
+<li>Open this file in any modern browser (no install or server required)</li>
+<li>Select a PADD region from the dropdown (defaults to U.S. Total)</li>
+<li>Click <strong>\u25b6 Run Forecast</strong> to generate the ensemble prediction</li>
+<li>Explore individual model contributions in the chart legend</li>
+<li>Run a <strong>Backtest</strong> to validate model accuracy over the last 26\u2013104 weeks</li>
+<li>Use the <strong>Meta-Learner</strong> tab to understand how models are being blended</li>
+<li>Add <strong>Analyst Adjustments</strong> to overlay qualitative views on the forecast</li>
+<li>Track your adjustment accuracy over time in the <strong>Adjustment Journal</strong></li>
+<li>Export forecasts to CSV with the \u2193 button</li>
+</ol>
+<blockquote><strong>PADD accuracy note:</strong> Forecast accuracy is highest for U.S. Total due to the volume of EIA data available. Individual PADD regions show higher MAPE because stock levels are smaller and S&amp;D data is sparser. PADD-level demand is estimated via stock-share proportioning of national product supplied data.</blockquote>
+<hr>
+<h2>V2 Changes</h2>
+<ul>
+<li><strong>Cross-PADD Snapshot</strong> now runs the full ensemble with real S&amp;D features for each PADD, matching Forecast tab calculations exactly</li>
+<li><strong>Backtest engine</strong> now uses the complete <code>runEnsemble()</code> pipeline (meta-learner + regime detection + inverse-MAE weighting) instead of a simple model average</li>
+<li><strong>Forecast metrics</strong> (MAPE, MAE, direction accuracy) now use S&amp;D features during their backtest validation, consistent with the live forecast</li>
+<li>All tabs share the same ensemble computation path \u2014 no divergence between what the Forecast tab shows and what Backtest or Cross-PADD reports</li>
+</ul>
+<hr>
+<h2>Technical Notes</h2>
+<ul>
+<li><strong>No build tools required.</strong> Single HTML file with CDN dependencies (Chart.js 4.4.4).</li>
+<li><strong>No backend.</strong> All computation runs client-side in the browser.</li>
+<li><strong>Data units:</strong> Thousand Barrels (kbbl) throughout, consistent with EIA reporting.</li>
+<li><strong>Persistence:</strong> Analyst adjustments and journal entries are stored in <code>localStorage</code>.</li>
+</ul>
+`;
+    helpBody.innerHTML = HELP_HTML;
+    document.getElementById('btn-help').addEventListener('click', () => {
+      helpOverlay.classList.add('open');
+    });
+    document.getElementById('help-modal-close').addEventListener('click', () => {
+      helpOverlay.classList.remove('open');
+    });
+    helpOverlay.addEventListener('click', (e) => {
+      if (e.target === helpOverlay) helpOverlay.classList.remove('open');
+    });
+
+    document.getElementById('btn-export-detail').addEventListener('click', () => {
+      const table = document.getElementById('detail-tbody')?.closest('table');
+      if (table) {
+        const text = Array.from(table.rows).map(r => Array.from(r.cells).map(c => c.textContent).join('\t')).join('\n');
+        navigator.clipboard.writeText(text).then(() => log('Table copied to clipboard', 'ok'));
+      }
+    });
+
+    // Time range controls
+    document.querySelectorAll('.time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        chartViewRange = btn.dataset.range;
+        chartCustomFrom = null;
+        chartCustomTo = null;
+        if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+      });
+    });
+    document.getElementById('date-from').addEventListener('change', (e) => {
+      chartCustomFrom = e.target.value;
+      document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+    });
+    document.getElementById('date-to').addEventListener('change', (e) => {
+      chartCustomTo = e.target.value;
+      document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+      if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+    });
+
+    // 5yr toggle
+    document.getElementById('chk-5yr').addEventListener('change', () => {
+      if (this.currentSeries && this.currentFc) renderMainChart(this.currentSeries, this.currentFc);
+    });
+
+    // Collapsible log
+    document.getElementById('log-toggle').addEventListener('click', () => {
+      document.getElementById('log-toggle').classList.toggle('open');
+      document.getElementById('log-body').classList.toggle('open');
+    });
+
+    // Tab switching
+    document.querySelectorAll('.page-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+
+    // Backtest controls
+    document.getElementById('btn-bt-run').addEventListener('click', () => this.runBacktestUI());
+    document.getElementById('bt-horizon').addEventListener('change', () => this.runBacktestUI());
+    document.getElementById('bt-window').addEventListener('change', () => this.runBacktestUI());
+
+    // Backtest table copy
+    document.getElementById('btn-bt-copy').addEventListener('click', () => {
+      const table = document.getElementById('bt-tbody')?.closest('table');
+      if (table) {
+        const text = Array.from(table.rows).map(r => Array.from(r.cells).map(c => c.textContent.trim()).join('\t')).join('\n');
+        navigator.clipboard.writeText(text).then(() => log('Backtest table copied', 'ok'));
+      }
+    });
+
+    // ─── Analyst Adjustments handlers ───
+    loadAdjustments();
+    loadJournal();
+    updateAdjPresetButtons();
+    renderAdjustmentsTable();
+    renderJournalUI();
+
+    document.getElementById('adj-type').addEventListener('change', updateAdjPresetButtons);
+    document.getElementById('sel-padd').addEventListener('change', updateAdjPresetButtons);
+
+    // Direction toggle
+    document.querySelectorAll('.adj-dir-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.adj-dir-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Add adjustment
+    document.getElementById('btn-adj-add').addEventListener('click', () => {
+      const impact = parseFloat(document.getElementById('adj-impact').value);
+      if (!impact || impact <= 0) { log('Enter a positive impact value (kbbl)', 'warn'); return; }
+      const dir = document.querySelector('.adj-dir-btn.active')?.dataset.dir;
+      const weeks = [false, false, false, false];
+      document.querySelectorAll('.adj-week-chk input').forEach(cb => {
+        weeks[parseInt(cb.value)] = cb.checked;
+      });
+      if (!weeks.some(w => w)) { log('Select at least one week', 'warn'); return; }
+
+      const newAdj = {
+        id: adjIdCounter++,
+        type: document.getElementById('adj-type').value,
+        direction: parseInt(dir) || 1,
+        impact: impact,
+        weeks: weeks,
+        notes: document.getElementById('adj-notes').value.trim()
+      };
+      analystAdjustments.push(newAdj);
+      saveAdjustments();
+      // Log to journal for future scoring
+      const padd = document.getElementById('sel-padd').value;
+      if (this.currentFc) journalLogAdjustment(newAdj, this.currentFc, padd);
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+      renderJournalUI();
+      document.getElementById('adj-impact').value = '';
+      document.getElementById('adj-notes').value = '';
+      log(`Adjustment added & logged to journal: ${ADJ_TYPE_LABELS[newAdj.type]} ${impact.toLocaleString()} kbbl`, 'ok');
+    });
+
+    // Clear all adjustments
+    document.getElementById('btn-adj-clear').addEventListener('click', () => {
+      if (analystAdjustments.length === 0) return;
+      analystAdjustments = [];
+      adjIdCounter = 0;
+      saveAdjustments();
+      renderAdjustmentsTable();
+      updateAdjCompare();
+      refreshChartWithAdjustments();
+      log('All adjustments cleared', 'ok');
+    });
+
+    document.getElementById('btn-journal-clear').addEventListener('click', () => {
+      if (adjustmentJournal.length === 0) return;
+      adjustmentJournal = [];
+      saveJournal();
+      renderJournalUI();
+      log('Adjustment journal cleared', 'ok');
+    });
+  },
+
+  runBacktestUI() {
+    if (!this.currentSeries || this.currentSeries.length < SEASON * 2 + 10) {
+      log('Not enough data for backtest', 'warn');
+      return;
+    }
+    const horizon = parseInt(document.getElementById('bt-horizon').value);
+    const windowSize = parseInt(document.getElementById('bt-window').value);
+    const spinner = document.getElementById('bt-spinner');
+    spinner.style.display = 'inline';
+    setStatus('loading', 'BACKTESTING...');
+    log(`--- Backtest: +${horizon}W horizon, ${windowSize}W window ---`);
+
+    // Use setTimeout to let the UI update before heavy computation
+    setTimeout(() => {
+      const t0 = performance.now();
+      const padd = document.getElementById('sel-padd').value;
+      const stockDates = this.currentSeries.map(d => d.date);
+      const sdF = buildSDFeatures(padd, stockDates, this.currentSeries);
+      const results = runBacktest(this.currentSeries, horizon, windowSize, sdF);
+      const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+      log(`Backtest complete: ${results.length} predictions in ${elapsed}s`, 'ok');
+      updateBacktestUI(results);
+      spinner.style.display = 'none';
+      setStatus('ready', 'READY');
+    }, 50);
+  },
+
+  async refreshIfStale() {
+    const age = Date.now() - this.dataLoadedAt;
+    if (age < this.DATA_TTL) return; // data is fresh
+    log('--- Data older than 30 min, auto-refreshing... ---', 'ok');
+    setStatus('loading', 'REFRESHING...');
+    for (const key in cache) delete cache[key];
+    for (const key in SD_DATA) delete SD_DATA[key];
+    WEIGHT_CACHE.clear();
+    this.rawData = {};
+    this.currentSeries = null;
+    this.currentFc = null;
+    this.forecastCache = {};
+    {
+      log(`Reloading ${PRODUCT_CFG.label}...`);
+      const url = stocUrl(PRODUCT_CFG.productCode);
+      const r = await tfetch(url);
+      const n = r?.response?.data?.length || 0;
+      if (n > 0) {
+        this.rawData[PRODUCT_KEY] = r;
+        const testSeries = extractSeries(r, 'NUS');
+        log(`  OK ${PRODUCT_CFG.label}: ${testSeries.length} wks`, 'ok');
+      } else {
+        log(`  ${PRODUCT_CFG.label}: no data`, 'warn');
+      }
+    }
+    log('Reloading S&D data...', 'ok');
+    await Promise.all([fetchSDProduction(), fetchSDTrade(), fetchSDRefinery(), fetchSDDemand()]);
+    document.getElementById('sd-badge').innerHTML = `S&D: <strong>${Object.keys(SD_DATA).length} series</strong>`;
+    this.dataLoadedAt = Date.now();
+    log('Auto-refresh complete', 'ok');
+  },
+
+  async runForecast(forceRefresh) {
+    await this.refreshIfStale();
+    const pk = PRODUCT_KEY;
+    const padd = document.getElementById('sel-padd').value;
+
+    const api = this.rawData[pk];
+    if (!api) { log('No data for this product', 'err'); setStatus('error', 'NO DATA'); return; }
+
+    const series = extractSeries(api, padd);
+    if (series.length < 20) { log(`Only ${series.length} weeks, need 20+`, 'err'); setStatus('error', 'INSUFFICIENT'); return; }
+
+    const latestDate = series[series.length - 1].date;
+    const cacheHit = !forceRefresh && this.forecastCache[padd] && this.forecastCache[padd].asOf === latestDate;
+
+    if (cacheHit) {
+      log(`--- ${PL[padd]} (cached) ---`);
+      const cached = this.forecastCache[padd];
+      this.currentSeries = cached.series;
+      this.currentFc = cached.fc;
+      this._renderForecastUI(cached.series, cached.fc, api);
+      return;
+    }
+
+    setStatus('loading', 'FORECASTING...');
+    log(`--- ${PRODUCT_CFG.label} / ${PL[padd]} ---`);
+    log(`${series.length} weeks (${series[0].date} to ${series[series.length - 1].date})`);
+
+    document.getElementById('data-badge').innerHTML = `Latest: <strong>${latestDate}</strong>`;
+
+    const stockDates = series.map(d => d.date);
+    const sdF = buildSDFeatures(padd, stockDates, series);
+    const sdCount = countSDFeatures(sdF);
+    log(`S&D features for ${PL[padd]}: ${sdCount}/8 available`);
+
+    const fc = runEnsemble(series, sdF, FC_WEEKS);
+    const last = series[series.length - 1].value;
+
+    // Cache this forecast
+    this.forecastCache[padd] = { series, fc, asOf: latestDate };
+
+    this._renderForecastUI(series, fc, api);
+  },
+
+  _renderForecastUI(series, fc, api) {
+    const last = series[series.length - 1].value;
+    const ld = new Date(series[series.length - 1].date);
+
+    document.getElementById('data-badge').innerHTML = `Latest: <strong>${series[series.length - 1].date}</strong>`;
+
+    // Year-over-year for forecast dates
+    const yoyData = [];
+    for (let h = 0; h < 4; h++) {
+      const fd = new Date(ld); fd.setDate(fd.getDate() + 7 * (h + 1));
+      const wk = weekOfYear(fd.toISOString().split('T')[0]);
+      const yr = fd.getFullYear();
+      let lyVal = null;
+      for (const d of series) {
+        const dyr = parseInt(d.date.substring(0, 4));
+        if (dyr === yr - 1 && Math.abs(weekOfYear(d.date) - wk) <= 1) {
+          lyVal = d.value;
+        }
+      }
+      yoyData.push(lyVal);
+    }
+
+    // Forecast cards
+    const adjFcCards = getAdjustedForecast(fc);
+    for (let h = 0; h < 4; h++) {
+      const v = fc.ensemble[h], ch = v - last, pct = last !== 0 ? (ch / last) * 100 : 0;
+      document.getElementById(`fc${h + 1}-val`).textContent = fmtVal(v);
+      document.getElementById(`fc${h + 1}-sub`).textContent = v.toLocaleString(undefined, {maximumFractionDigits: 0}) + ' kbbl';
+
+      const badge = document.getElementById(`fc${h + 1}-badge`);
+      badge.textContent = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+      badge.className = 'fc-badge ' + (ch >= 0 ? 'up' : 'down');
+
+      const adjEl = document.getElementById(`fc${h + 1}-adj`);
+      if (adjFcCards && adjFcCards[h] !== v) {
+        adjEl.textContent = `(${adjFcCards[h].toLocaleString(undefined, {maximumFractionDigits: 0})} kbbl) Adj.`;
+        adjEl.style.display = '';
+      } else {
+        adjEl.style.display = 'none';
+      }
+
+      document.getElementById(`fc${h + 1}-rng`).textContent = `80% CI: ${fmtVal(v + fc.ciLow[h])} — ${fmtVal(v + fc.ciHigh[h])}`;
+
+      const yoyEl = document.getElementById(`fc${h + 1}-yoy`);
+      if (yoyData[h] != null && yoyData[h] !== 0) {
+        const yoyChg = ((v - yoyData[h]) / yoyData[h] * 100).toFixed(1);
+        yoyEl.textContent = `YoY: ${yoyChg >= 0 ? '+' : ''}${yoyChg}%`;
+      } else {
+        yoyEl.textContent = '';
+      }
+    }
+
+    // Metrics
+    document.getElementById('m-mape').textContent = fc.metrics.mape;
+    document.getElementById('m-mae').textContent = fc.metrics.mae;
+    document.getElementById('m-dir').textContent = fc.metrics.dirAcc;
+    document.getElementById('m-w1').textContent = (fc.weights[0] * 100).toFixed(0) + '%';
+    document.getElementById('m-w2').textContent = (fc.weights[1] * 100).toFixed(0) + '%';
+    document.getElementById('m-w3').textContent = (fc.weights[2] * 100).toFixed(0) + '%';
+    document.getElementById('m-regime').textContent = fc.regime ? fc.regime.season.toUpperCase() : '—';
+    document.getElementById('m-meta').textContent = fc.hasMeta ? 'Active' : 'Off';
+    document.getElementById('m-valw').textContent = fc.metrics.valWeeks + ' wks';
+    document.getElementById('m-ciw').textContent = (fc.metrics.ciWeeks || '—') + ' wks';
+    document.getElementById('m-sdcount').textContent = fc.sdFeatureCount + ' / 8';
+    document.getElementById('m-active').textContent = fc.activeCount + (fc.needFallback ? ' (+fallbacks)' : '');
+
+    const mapeVal = parseFloat(fc.metrics.mape);
+    if (!isNaN(mapeVal)) {
+      document.getElementById('mi-mape').dataset.quality = mapeVal < 2 ? 'good' : mapeVal < 5 ? 'ok' : 'poor';
+    }
+    const dirVal = parseInt(fc.metrics.dirAcc);
+    if (!isNaN(dirVal)) {
+      document.getElementById('mi-dir').dataset.quality = dirVal >= 65 ? 'good' : dirVal >= 50 ? 'ok' : 'poor';
+    }
+
+    // Detail table
+    const dt = document.getElementById('detail-tbody');
+    const adjFcDetail = getAdjustedForecast(fc);
+    const adjTh = document.getElementById('detail-adj-th');
+    adjTh.style.display = adjFcDetail ? '' : 'none';
+    let dr = '';
+    for (let h = 0; h < FC_WEEKS; h++) {
+      const d = new Date(ld); d.setDate(d.getDate() + 7 * (h + 1));
+      const e = fc.ensemble[h], pv = h === 0 ? last : fc.ensemble[h - 1], ch = e - pv;
+      dr += `<tr><td>${d.toISOString().split('T')[0]}</td>
+        <td>${fmtVal(e)}</td>
+        <td class="${ch >= 0 ? 'positive' : 'negative'}">${fmtChg(ch)}</td>
+        <td>${fmtVal(e + fc.ciLow[h])}</td><td>${fmtVal(e + fc.ciHigh[h])}</td>
+        <td>${fmtVal(fc.sdReg[h])}</td><td>${fmtVal(fc.sdBalance[h])}</td><td>${fmtVal(fc.arModel[h])}</td>`;
+      if (adjFcDetail) {
+        const adjV = adjFcDetail[h], adjDiff = adjV - e;
+        dr += `<td style="color:${adjDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};font-weight:600">${fmtVal(adjV)}</td>`;
+      }
+      dr += '</tr>';
+    }
+    dt.innerHTML = dr;
+
+    this.currentSeries = series;
+    this.currentFc = fc;
+    renderMainChart(series, fc);
+    renderSeasonalChart(series);
+    updateMetaLearnerTab(fc);
+    updateAdjCompare();
+    updateAdjPresetButtons();
+
+    journalScoreEntries(series);
+    renderJournalUI();
+
+    setStatus('ready', 'READY');
+
+    // Deferred: cross-PADD snapshot (non-blocking)
+    if (api) {
+      setTimeout(() => {
+        const pt = document.getElementById('padd-tbody');
+        let pr = '';
+        for (const p of PADDS) {
+          const s = extractSeries(api, p);
+          if (s.length < 52) { pr += `<tr><td>${PL[p]}</td><td colspan="5">Insufficient data</td></tr>`; continue; }
+          const lt = s[s.length - 1].value, pv = s[s.length - 2].value, wc = lt - pv;
+          let f1 = lt, f4 = lt;
+          try {
+            const paddDates = s.map(d => d.date);
+            const paddSdF = buildSDFeatures(p, paddDates, s);
+            const f = runEnsembleLite(s, paddSdF, 4);
+            f1 = f.ensemble[0]; f4 = f.ensemble[3];
+          } catch(e) {}
+          const wk = weekOfYear(s[s.length - 1].date), yr = parseInt(s[s.length - 1].date.substring(0, 4));
+          let a5 = 0, c5 = 0;
+          for (const d of s) {
+            const dy = parseInt(d.date.substring(0, 4));
+            if (dy < yr && dy >= yr - 5 && Math.abs(weekOfYear(d.date) - wk) <= 1) { a5 += d.value; c5++; }
+          }
+          a5 = c5 > 0 ? a5 / c5 : lt;
+          const v5 = lt - a5;
+          pr += `<tr><td>${PL[p]}</td><td>${fmtVal(lt)}</td>
+            <td class="${wc >= 0 ? 'positive' : 'negative'}">${fmtChg(wc)}</td>
+            <td>${fmtVal(f1)}</td><td>${fmtVal(f4)}</td>
+            <td class="${v5 >= 0 ? 'positive' : 'negative'}">${fmtChg(v5)}</td></tr>`;
+        }
+        pt.innerHTML = pr;
+      }, 50);
+    }
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// BACKTEST ENGINE
+// ═══════════════════════════════════════════════════════════
+function runBacktest(series, horizon, windowSize, sdF) {
+  const n = series.length;
+  const results = [];
+  const startIdx = Math.max(n - windowSize - horizon, SEASON * 2 + 10);
+  const META_RETRAIN_INTERVAL = 8;
+
+  let cachedMeta = null;
+  let cachedWeights = null;
+  let stepsSinceRetrain = META_RETRAIN_INTERVAL;
+
+  for (let t = startIdx; t < n - horizon; t++) {
+    const sub = series.slice(0, t + 1);
+    if (sub.length < SEASON * 2) continue;
+
+    const sdSub = {};
+    for (const k of Object.keys(sdF || {})) {
+      if (sdF[k]) sdSub[k] = sdF[k].slice(0, t + 1);
+    }
+
+    // Retrain meta-learner and weights periodically
+    if (stepsSinceRetrain >= META_RETRAIN_INTERVAL) {
+      const hasSd = countSDFeatures(sdSub) >= 3;
+      cachedWeights = calcWeights(sub, sdSub, !hasSd);
+      cachedMeta = trainMetaLearner(sub, sdSub);
+      stepsSinceRetrain = 0;
+    }
+    stepsSinceRetrain++;
+
+    try {
+      const regime = detectRegime(sub, sdSub);
+      const hasSdData = countSDFeatures(sdSub) >= 3;
+      const m1 = sdRegression(sub, sdSub, horizon);
+      const m2 = sdBalanceModel(sub, sdSub, horizon);
+      const m3 = arModel(sub, horizon);
+      const primaryCount = [m1, m2, m3].filter(m => m !== null).length;
+      const needFallback = !hasSdData || primaryCount < 2;
+      const m4 = needFallback ? seasonalNaive(sub, horizon) : null;
+      const m5 = needFallback ? holtWinters(sub, horizon) : null;
+      const models = [m1, m2, m3, m4, m5];
+      const w = cachedWeights || (needFallback ? [.3, .2, .2, .15, .15] : [.4, .3, .3, 0, 0]);
+
+      const fc = [];
+      for (let h = 0; h < horizon; h++) {
+        let val = null;
+        if (cachedMeta && cachedMeta.mean && m1 && m2 && m3) {
+          const rf = regimeFeatures(regime);
+          const mf = [m1[h], m2[h], m3[h], ...rf];
+          val = applyMetaLearner(cachedMeta, mf);
+          const mo = [m1[h], m2[h], m3[h]];
+          const mn = Math.min(...mo), mx = Math.max(...mo), range = mx - mn;
+          if (val < mn - range * 0.5 || val > mx + range * 0.5) val = null;
+        }
+        if (val == null) {
+          let ws = 0, vs = 0;
+          for (let i = 0; i < NUM_MODELS; i++) {
+            if (models[i]) { vs += w[i] * models[i][h]; ws += w[i]; }
+          }
+          val = ws > 0 ? vs / ws : sub[sub.length - 1].value;
+        }
+        fc.push(val);
+      }
+
+      const ensPred = fc[horizon - 1];
+      const actual = series[t + horizon].value;
+      const predDate = series[t + horizon].date;
+      const fromDate = series[t].date;
+      const lastKnown = sub[sub.length - 1].value;
+
+      results.push({
+        predDate,
+        fromDate,
+        actual,
+        ensemble: ensPred,
+        sd: m1 ? m1[horizon - 1] : null,
+        sdbal: m2 ? m2[horizon - 1] : null,
+        ar: m3 ? m3[horizon - 1] : null,
+        error: ensPred - actual,
+        absError: Math.abs(ensPred - actual),
+        pctError: Math.abs(actual) > 0 ? Math.abs(ensPred - actual) / Math.abs(actual) * 100 : 0,
+        dirCorrect: (ensPred >= lastKnown) === (actual >= lastKnown)
+      });
+    } catch(e) { /* skip */ }
+  }
+  return results;
+}
+
+function renderBacktestChart(results) {
+  const ctx = document.getElementById('chart-backtest').getContext('2d');
+  if (backtestChart) backtestChart.destroy();
+
+  const actualData = results.map(r => ({x: r.predDate, y: r.actual}));
+  const ensData = results.map(r => ({x: r.predDate, y: r.ensemble}));
+  // Error band
+  const errUp = results.map(r => ({x: r.predDate, y: r.ensemble + r.absError}));
+  const errDn = results.map(r => ({x: r.predDate, y: r.ensemble - r.absError}));
+
+  backtestChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [
+        {label: 'Actual', data: actualData, borderColor: CC.history, borderWidth: 2.5, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: CC.history, tension: .1, order: 1},
+        {label: 'Predicted (Ensemble)', data: ensData, borderColor: CC.forecast, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: CC.forecast, borderDash: [6, 3], tension: .1, order: 2},
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 11}, boxWidth: 12, padding: 16}},
+        tooltip: {
+          ...tooltipStyle,
+          mode: 'index', intersect: false,
+          callbacks: {
+            label: c => {
+              const val = c.parsed.y;
+              if (val == null) return '';
+              return ` ${c.dataset.label}: ${val.toLocaleString(undefined, {maximumFractionDigits: 1})}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {type: 'time', time: {unit: 'month', tooltipFormat: 'MMM dd, yyyy'}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, maxRotation: 0}},
+        y: {grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+      }
+    }
+  });
+}
+
+function renderBtScatter(results) {
+  const ctx = document.getElementById('chart-bt-scatter').getContext('2d');
+  if (btScatterChart) btScatterChart.destroy();
+
+  if (results.length === 0) return;
+  const points = results.map(r => ({x: r.actual, y: r.ensemble}));
+  const allVals = results.flatMap(r => [r.actual, r.ensemble]);
+  const mn = Math.min(...allVals), mx = Math.max(...allVals);
+  const pad = (mx - mn) * 0.05;
+
+  btScatterChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {label: 'Predicted vs Actual', data: points, backgroundColor: 'rgba(57,210,192,0.5)', borderColor: CC.forecast, pointRadius: 4, pointHoverRadius: 6},
+        {label: 'Perfect Line', data: [{x: mn - pad, y: mn - pad}, {x: mx + pad, y: mx + pad}], type: 'line', borderColor: 'rgba(139,148,158,0.3)', borderWidth: 1.5, borderDash: [6, 4], pointRadius: 0, fill: false}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {labels: {color: '#b0b8c1', font: {family: 'JetBrains Mono', size: 10}, boxWidth: 10, padding: 12}},
+        tooltip: {
+          ...tooltipStyle,
+          callbacks: {
+            label: c => {
+              if (c.datasetIndex === 1) return '';
+              return ` Actual: ${c.parsed.x?.toLocaleString()} | Pred: ${c.parsed.y?.toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {title: {display: true, text: 'Actual (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}},
+        y: {title: {display: true, text: 'Predicted (kbbl)', color: '#9ca3af', font: {family: 'JetBrains Mono', size: 11}}, grid: {color: 'rgba(33,38,45,0.8)'}, ticks: {color: '#9ca3af', font: {family: 'JetBrains Mono', size: 10}, callback: yTickFmt}}
+      }
+    }
+  });
+}
+
+function updateBacktestUI(results) {
+  if (!results.length) return;
+
+  // Summary stats
+  const mape = results.reduce((s, r) => s + r.pctError, 0) / results.length;
+  const mae = results.reduce((s, r) => s + r.absError, 0) / results.length;
+  const dirOk = results.filter(r => r.dirCorrect).length;
+  const dirPct = (dirOk / results.length * 100);
+
+  document.getElementById('bt-mape').textContent = mape.toFixed(2) + '%';
+  document.getElementById('bt-mae').textContent = fmtVal(mae);
+  document.getElementById('bt-dir').textContent = dirPct.toFixed(0) + '%';
+  document.getElementById('bt-count').textContent = results.length;
+  document.getElementById('bt-range-label').textContent = `${results[0].predDate} to ${results[results.length - 1].predDate}`;
+
+  // Per-model MAE for error bars
+  const modelMAEs = {};
+  const modelKeys = ['ensemble', 'sd', 'sdbal', 'ar'];
+  const barIds = ['ens', 'sd', 'sdbal', 'ar'];
+  for (const k of modelKeys) {
+    const valid = results.filter(r => r[k] != null);
+    modelMAEs[k] = valid.length > 0 ? valid.reduce((s, r) => s + Math.abs(r[k] - r.actual), 0) / valid.length : null;
+  }
+  const maxMAE = Math.max(...Object.values(modelMAEs).filter(v => v != null));
+  for (let i = 0; i < modelKeys.length; i++) {
+    const maeVal = modelMAEs[modelKeys[i]];
+    const barEl = document.getElementById('btbar-' + barIds[i]);
+    const valEl = document.getElementById('btval-' + barIds[i]);
+    if (maeVal != null) {
+      barEl.style.width = (maeVal / maxMAE * 100).toFixed(1) + '%';
+      valEl.textContent = fmtVal(maeVal);
+    } else {
+      barEl.style.width = '0%';
+      valEl.textContent = 'N/A';
+    }
+  }
+
+  // Detail table
+  const tbody = document.getElementById('bt-tbody');
+  let html = '';
+  for (const r of results.slice().reverse()) {
+    const errCls = r.error >= 0 ? 'positive' : 'negative';
+    const dirIcon = r.dirCorrect ? '<span style="color:var(--accent-green)">&#10003;</span>' : '<span style="color:var(--accent-red)">&#10007;</span>';
+    html += `<tr>
+      <td>${r.predDate}</td>
+      <td>${fmtVal(r.ensemble)}</td>
+      <td>${fmtVal(r.actual)}</td>
+      <td class="${errCls}">${fmtChg(r.error)}</td>
+      <td class="${errCls}">${r.pctError.toFixed(2)}%</td>
+      <td>${dirIcon}</td>
+      <td>${r.sd != null ? fmtVal(r.sd) : '—'}</td>
+      <td>${r.sdbal != null ? fmtVal(r.sdbal) : '—'}</td>
+      <td>${r.ar != null ? fmtVal(r.ar) : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+
+  // Charts
+  renderBacktestChart(results);
+  renderBtScatter(results);
+}
+
+// BOOT
+window.addEventListener('DOMContentLoaded', () => {
+  APP.init().catch(err => {
+    log('FATAL: ' + err.message, 'err');
+    console.error(err);
+    setLoader(100, 'Error — see log');
+    setStatus('error', 'ERROR');
+    setTimeout(() => document.getElementById('loading-overlay').classList.add('hidden'), 1500);
+  });
+});
+</script>
+</body>
+</html>
