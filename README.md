@@ -144,12 +144,14 @@ Provides transparency into how the ensemble is making decisions:
 ## Files
 
 ```
-gasoline_model_predictive/
-├── gasoline_stock_predictions_v5.html   # Main dashboard (single file)
-├── gasoline_stock_predictions_v4.html   # Prior version
-├── gasoline_stock_predictions_v3.html   # Prior version
+gasoline_stock_predictions/
+├── gasoline_stock_predictions_v5.html       # Full dashboard (RBOB, CBOB, Total Gas)
+├── Total_Gasoline_Stocks_Model.html         # Total Gas focused model v6.0
+├── Total_Gasoline_Stocks_Model_V2.html      # Total Gas focused model v6.2 (consistency fixes)
+├── gasoline_stock_predictions_v4.html       # Prior version
+├── gasoline_stock_predictions_v3.html       # Prior version
 └── .claude/
-    └── launch.json                      # Local dev server config (port 8085)
+    └── launch.json                          # Local dev server config (port 8085)
 ```
 
 ---
@@ -158,6 +160,8 @@ gasoline_model_predictive/
 
 | Version | Key Changes |
 |---------|-------------|
+| Total Gas v6.2 | Cross-PADD snapshot uses real S&D features, backtest uses full ensemble pipeline, metrics use S&D-aware validation, weight cache key collision fix |
+| Total Gas v6.0 | Total Motor Gasoline focused model with analyst adjustments, adjustment journal, forward-tracking accuracy scoring |
 | v5 | Meta-learner with regime detection, stacked generalization, 52-wk CI window, auto-refresh on Run Forecast, Meta-Learner tab, weight cache collision fix |
 | v4 | Holt-Winters fallback, inverse-MAE weighted ensemble |
 | v3 | AR(6) model added, PADD support |
